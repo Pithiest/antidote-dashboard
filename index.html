@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#16615e" />
+    <title>Antidote 个人症状资料库</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2316615e'/%3E%3Cpath d='M18 40 31 14l15 26h-8l-3-7H25l-3 7z' fill='white'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="locked">
+    <section class="login-gate" aria-label="Antidote 登录">
+      <div class="login-card">
+        <span class="brand-mark">A</span>
+        <h1>Antidote</h1>
+        <p>输入网站专属密码后进入个人症状追踪系统。</p>
+        <label for="loginPassword">
+          网站密码
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="输入密码" />
+        </label>
+        <button id="loginButton" class="primary-button" type="button">进入</button>
+        <p id="loginStatus" class="muted-text">未登录时不会显示云端资料。</p>
+      </div>
+    </section>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand">
+          <span class="brand-mark">A</span>
+          <div>
+            <strong>Antidote</strong>
+            <span>个人治疗数据系统</span>
+          </div>
+        </div>
+
+        <nav class="side-nav">
+          <a href="#today" class="nav-link active" data-target="today">今日</a>
+          <a href="#entry" class="nav-link" data-target="entry">记录</a>
+          <a href="#trends" class="nav-link" data-target="trends">趋势</a>
+          <a href="#knowledge" class="nav-link" data-target="knowledge">资料库</a>
+          <a href="#research" class="nav-link" data-target="research">研究</a>
+        </nav>
+
+        <section class="sync-card">
+          <label for="sitePassword">网站密码</label>
+          <div class="sync-row">
+            <input id="sitePassword" type="password" autocomplete="current-password" placeholder="已登录" />
+            <button id="syncButton" class="icon-button" title="刷新云端数据" aria-label="刷新云端数据">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 5v5h5M4 13a8 8 0 0 0 14.9 4M20 19v-5h-5" /></svg>
+            </button>
+          </div>
+          <p id="syncStatus">已改为专属密码登录；刷新后从 Supabase 拉取资料。</p>
+        </section>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <p class="section-label">当前目标</p>
+            <h1>降低右侧抽动和走路难受</h1>
+          </div>
+          <div class="topbar-actions">
+            <button id="seedButton" class="ghost-button" type="button">刷新云端</button>
+            <button id="exportButton" class="ghost-button" type="button">导出 JSON</button>
+          </div>
+        </header>
+
+        <section id="today" class="view-section active">
+          <div class="today-grid">
+            <article class="primary-panel">
+              <div class="panel-title">
+                <div>
+                  <p class="section-label">今日建议</p>
+                  <h2 id="currentStage">等待数据</h2>
+                </div>
+                <span id="latestClass" class="class-pill">--</span>
+              </div>
+              <p id="currentFocus" class="focus-text">登录并读取云端资料后生成。</p>
+              <p id="currentRationale" class="muted-text"></p>
+              <div class="action-columns">
+                <div>
+                  <h3>今天只做</h3>
+                  <ul id="doNowList"></ul>
+                </div>
+                <div>
+                  <h3>今天不做</h3>
+                  <ul id="avoidList"></ul>
+                </div>
+              </div>
+              <div class="next-variable">
+                <span>单一变量</span>
+                <strong id="nextVariable">不新增变量</strong>
+              </div>
+            </article>
+
+            <article class="protocol-panel">
+              <div class="protocol-block">
+                <p class="section-label">发作当下 90 秒</p>
+                <ol id="episodeProtocol"></ol>
+              </div>
+              <div class="protocol-block">
+                <p class="section-label">紧急叫起 / 骑行前 60 秒</p>
+                <ol id="urgentProtocol"></ol>
+              </div>
+              <p id="safetyNote" class="safety-note">骑行途中抽动或车把不稳时，优先安全靠边停下。</p>
+            </article>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card"><span>最近发作</span><strong id="latestEpisode">--</strong></article>
+            <article class="metric-card"><span>右脚不听使唤</span><strong id="latestFoot">--</strong></article>
+            <article class="metric-card"><span>右髋外旋痛</span><strong id="latestHip">--</strong></article>
+            <article class="metric-card"><span>小腿电流感</span><strong id="latestElectric">--</strong></article>
+          </div>
+        </section>
+
+        <section id="entry" class="view-section">
+          <article class="form-panel">
+            <div class="panel-title"><div><p class="section-label">每日录入</p><h2>按你的症状定制的记录表</h2></div><span id="saveState">未保存</span></div>
+            <form id="entryForm">
+              <div class="form-grid">
+                <label>日期<input name="entry_date" type="date" required /></label>
+                <fieldset><legend>今天属于</legend><div class="segmented" data-field="day_class"><button type="button" data-value="A">A 好转</button><button type="button" data-value="B" class="selected">B 不稳</button><button type="button" data-value="C">C 加重</button></div><input name="day_class" type="hidden" value="B" /></fieldset>
+                <label>起床后抽动<select name="morning_twitch"><option value="lighter">更轻</option><option value="same">差不多</option><option value="worse">更重</option></select></label>
+                <label>被吓到后抽动<select name="startle_trigger"><option value="down">下降</option><option value="same">差不多</option><option value="up">上升</option></select></label>
+                <label>走路难受 0-10<input name="walking_discomfort" type="range" min="0" max="10" value="5" /><span class="range-value">5</span></label>
+                <label>右脚不听使唤 0-10<input name="right_foot_control" type="range" min="0" max="10" value="5" /><span class="range-value">5</span></label>
+                <label>走 40 步卡顿几次<input name="forty_step_stumbles" type="number" min="0" step="1" placeholder="例如 2" /></label>
+                <label>右腿抬起后大腿内侧酸 0-10<input name="inner_thigh_acid" type="range" min="0" max="10" value="4" /><span class="range-value">4</span></label>
+                <label>发作峰值强度 0-10<input name="episode_peak_intensity" type="range" min="0" max="10" value="4" /><span class="range-value">4</span></label>
+                <label>活动受限 0-10<input name="walking_limitation" type="range" min="0" max="10" value="4" /><span class="range-value">4</span></label>
+                <label>右髋外旋/外展臀痛快抽筋 0-10<input name="right_hip_external_rotation_pain" type="range" min="0" max="10" value="5" /><span class="range-value">5</span></label>
+                <label>右髋弹响/卡顿 0-10<input name="right_hip_snap" type="range" min="0" max="10" value="4" /><span class="range-value">4</span></label>
+                <label>右小腿电流感 0-10<input name="right_lower_leg_electric" type="range" min="0" max="10" value="3" /><span class="range-value">3</span></label>
+                <label>上下楼踩偏/踩空感 0-10<input name="stairs_instability" type="range" min="0" max="10" value="4" /><span class="range-value">4</span></label>
+                <label>发作持续分钟<input name="episode_minutes" type="number" min="0" step="0.5" placeholder="例如 6" /></label>
+                <label>睡眠小时<input name="sleep_hours" type="number" min="0" max="24" step="0.5" placeholder="可不填" /></label>
+              </div>
+
+              <fieldset class="trigger-fieldset"><legend>触发因素</legend><div class="chip-grid" id="triggerTags">
+                <label><input type="checkbox" value="晨起" />晨起</label><label><input type="checkbox" value="午睡后" />午睡后</label><label><input type="checkbox" value="紧急叫起" />紧急叫起</label><label><input type="checkbox" value="骑行" />骑电动车</label><label><input type="checkbox" value="惊吓" />惊吓</label><label><input type="checkbox" value="活动切换" />活动切换</label><label><input type="checkbox" value="走路" />走路</label><label><input type="checkbox" value="跑步启动" />跑步启动</label><label><input type="checkbox" value="运动停止后" />运动停止后</label><label><input type="checkbox" value="转身" />右转/向后转</label><label><input type="checkbox" value="上下楼" />上下楼</label><label><input type="checkbox" value="右髋外旋" />右髋外旋</label><label><input type="checkbox" value="引体向上" />引体向上</label><label><input type="checkbox" value="蛙泳腿" />蛙泳腿</label><label><input type="checkbox" value="冷热变化" />冷热变化</label>
+              </div></fieldset>
+
+              <div class="check-grid"><label><input name="e_bike" type="checkbox" />骑电动车时发生</label><label><input name="urgent_wake" type="checkbox" />被紧急叫起后发生</label><label><input name="handlebar_unstable" type="checkbox" />车把/右手控制受影响</label><label><input name="running_trigger" type="checkbox" />跑步诱发</label><label><input name="pullup_trigger" type="checkbox" />引体向上诱发</label><label><input name="frog_kick_trigger" type="checkbox" />蛙泳腿诱发</label><label><input name="turning_trigger" type="checkbox" />转体诱发</label><label><input name="stop_after_activity_trigger" type="checkbox" />运动停止后诱发</label><label><input name="medication_taken" type="checkbox" checked />今天按医嘱服药</label></div>
+              <label>今天做过的训练/活动<textarea name="training_done" rows="2" placeholder="例如：没有跑步；只做起身流程和右脚落点走"></textarea></label>
+              <label>最明显场景<textarea name="activity_context" rows="2" placeholder="例如：午睡中被叫起 5 分钟后骑车途中诱发，持续 5-6 分钟"></textarea></label>
+              <label>有效缓解动作<input name="relief_actions" type="text" placeholder="用逗号分隔，例如 长呼气, 扶墙踏步, 右脚全脚掌踏地" /></label>
+              <label>备注<textarea name="notes" rows="3" placeholder="记录当时右腿、右臀、右手、走路、情绪/惊吓和恢复过程"></textarea></label>
+              <label>安全备注<input name="safety_notes" type="text" placeholder="例如：骑行中右手抓车把不稳，已靠边停" /></label>
+              <div class="form-actions"><button class="primary-button" type="submit">保存并生成建议</button><button class="ghost-button" type="button" id="resetForm">清空</button></div>
+            </form>
+          </article>
+        </section>
+
+        <section id="trends" class="view-section"><div class="dashboard-grid"><article class="chart-panel wide"><div class="panel-title"><h2>右脚 / 右髋 / 神经样指标</h2><span>最近 14 条</span></div><canvas id="lineChart" height="260"></canvas></article><article class="chart-panel"><div class="panel-title"><h2>发作持续时间</h2><span>分钟</span></div><canvas id="durationChart" height="260"></canvas></article><article class="chart-panel"><div class="panel-title"><h2>A/B/C 分布</h2><span id="classSummary">--</span></div><div id="classBars" class="bars"></div></article><article class="chart-panel wide"><div class="panel-title"><h2>触发因素</h2><span>按出现次数</span></div><div id="triggerBars" class="bars"></div></article><article class="chart-panel"><div class="panel-title"><h2>骑行 / 紧急叫起</h2><span>安全相关</span></div><div id="safetyStats" class="stat-list"></div></article></div></section>
+        <section id="knowledge" class="view-section"><div class="knowledge-grid"><article class="knowledge-panel"><div class="panel-title"><h2>症状档案</h2><span id="profileUpdated">自动初始化</span></div><div id="profileSummary"></div></article><article class="knowledge-panel"><div class="panel-title"><h2>历史关键线索</h2><span>按重要度排序</span></div><div id="eventTimeline" class="timeline"></div></article><article class="knowledge-panel wide"><div class="panel-title"><h2>候选模型</h2><span>不是诊断，用来指导每日实验</span></div><div id="hypothesisList" class="hypothesis-list"></div></article></div></section>
+        <section id="research" class="view-section"><div class="research-grid"><article class="research-panel"><div class="panel-title"><h2>最新研究结论</h2><span>AnySearch + 本地资料</span></div><div id="researchList" class="research-list"></div></article><article class="history-panel"><div class="panel-title"><h2>每日记录</h2><span id="historyCount">--</span></div><div id="historyList" class="history-list"></div></article></div></section>
+      </main>
+    </div>
+
+    <nav class="bottom-nav" aria-label="底部导航"><button class="active" data-target="today">今日</button><button data-target="entry">记录</button><button data-target="trends">趋势</button><button data-target="knowledge">资料</button><button data-target="research">研究</button></nav>
+    <script src="./app.js"></script>
+  </body>
+</html>
