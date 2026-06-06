@@ -4,143 +4,137 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f9f8" />
-    <meta name="description" content="Antidote 私人行动指令台" />
+    <meta
+      name="description"
+      content="Antidote 私人康复指挥台，聚焦今日行动、发作处理、步态与右侧抽动的低刺激复盘。"
+    />
     <title>Antidote</title>
+    <link rel="icon" href="./assets/antidote-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./styles.css" />
-    <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-    <script defer src="./app.js"></script>
+    <script type="module" defer src="./app.js"></script>
   </head>
   <body class="locked">
-    <section class="login-gate" aria-label="Antidote 登录">
-      <form id="loginForm" class="login-panel">
-        <div class="login-brand">
-          <span class="brand-mark" aria-hidden="true">A</span>
-          <div>
-            <h1>Antidote</h1>
-            <p>私人行动指令台</p>
-          </div>
+    <section class="login-screen" aria-label="网站登录">
+      <form id="loginForm" class="auth-card">
+        <img src="./assets/antidote-mark.svg" alt="" class="auth-mark" />
+        <div class="auth-copy">
+          <h1>Antidote</h1>
+          <p>私人康复指挥台</p>
         </div>
-        <label for="loginPassword">网站密码</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="输入密码" />
-        <button class="button primary" type="submit">
-          <span>进入</span>
-          <i data-lucide="arrow-right" aria-hidden="true"></i>
+        <label class="field">
+          <span>网站密码</span>
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="输入密码" />
+        </label>
+        <button class="button primary auth-submit" type="submit">
+          <span>进入指挥台</span>
         </button>
-        <p id="loginStatus" class="system-message" role="status">登录后读取你的今日指令。</p>
+        <p id="loginStatus" class="system-message" role="status">陌生设备首次验证后会保持登录。</p>
       </form>
     </section>
 
-    <div class="console-shell">
-      <header class="console-header">
-        <div class="header-brand">
-          <span class="brand-mark" aria-hidden="true">A</span>
-          <div>
-            <div class="brand-line">
+    <main id="appShell" class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <img src="./assets/antidote-mark.svg" alt="" class="brand-mark" />
+          <div class="brand-copy">
+            <div class="brand-row">
               <strong>Antidote</strong>
               <span id="todayLabel">--</span>
             </div>
-            <span class="brand-subline">私人行动指令台</span>
+            <p>私人康复指挥台</p>
           </div>
         </div>
-        <div class="header-actions">
-          <span id="syncStatus" class="sync-status" role="status" aria-live="polite">
-            <span class="sync-dot" aria-hidden="true"></span>
-            <span id="syncStatusText">等待同步</span>
-          </span>
-          <button id="syncButton" class="icon-button" type="button" aria-label="刷新数据" title="刷新数据">
-            <i data-lucide="refresh-cw" aria-hidden="true"></i>
+
+        <div class="topbar-actions">
+          <span id="deviceStatus" class="device-chip">陌生设备需首次验证</span>
+          <button id="syncButton" class="icon-button" type="button" aria-label="刷新">
+            <span class="icon" data-icon="refresh"></span>
             <span>刷新</span>
           </button>
-          <button id="logoutButton" class="icon-button" type="button" aria-label="退出" title="退出">
-            <i data-lucide="log-out" aria-hidden="true"></i>
+          <button id="logoutButton" class="icon-button" type="button" aria-label="退出">
+            <span class="icon" data-icon="logout"></span>
             <span>退出</span>
           </button>
         </div>
       </header>
 
-      <main class="command-surface">
-        <section class="action-zone" aria-labelledby="guidanceTitle" data-testid="action-zone">
-          <div class="action-heading">
+      <section class="dashboard-grid" aria-label="今日行动">
+        <article class="primary-panel">
+          <div class="panel-heading">
             <div>
-              <p class="section-label">今天只做这一件事</p>
+              <p class="section-label">今天只做这件事</p>
               <h1 id="guidanceTitle">正在读取今日指令</h1>
             </div>
-            <span class="guidance-state">
-              <i data-lucide="circle-alert" aria-hidden="true"></i>
-              <span id="guidanceState">同步中</span>
-            </span>
+            <span id="guidanceState" class="state-chip">同步中</span>
           </div>
 
-          <p id="guidanceFocus" class="guidance-focus">稍等片刻，正在根据最近记录生成今天的行动顺序。</p>
+          <p id="guidanceFocus" class="guidance-focus">
+            等待片刻，正在根据最近记录生成今天的行动顺序。
+          </p>
           <p id="guidanceRationale" class="guidance-rationale"></p>
 
-          <ol id="actionSteps" class="action-steps"></ol>
+          <ol id="actionSteps" class="action-list"></ol>
 
-          <div class="primary-actions">
-            <button id="episodeButton" class="button episode-button" type="button" data-testid="episode-button">
-              <i data-lucide="activity" aria-hidden="true"></i>
+          <div class="action-bar">
+            <button id="episodeButton" class="button episode-button" type="button">
+              <span class="icon" data-icon="activity"></span>
               <span>我现在在发作</span>
             </button>
-            <button id="checkinButton" class="button primary" type="button" data-testid="checkin-button">
-              <i data-lucide="pencil-line" aria-hidden="true"></i>
+            <button id="checkinButton" class="button primary" type="button">
+              <span class="icon" data-icon="edit"></span>
               <span>填写今日变化</span>
             </button>
           </div>
-        </section>
+        </article>
 
-        <aside class="decision-rail" aria-label="今日限制和趋势判断">
-          <section class="rail-section avoid-section">
+        <aside class="side-rail" aria-label="限制与观察">
+          <section class="rail-panel">
             <div class="rail-heading">
-              <i data-lucide="circle-slash-2" aria-hidden="true"></i>
+              <span class="icon subtle" data-icon="ban"></span>
               <h2>今天避免</h2>
             </div>
-            <ul id="avoidList" class="avoid-list"></ul>
+            <ul id="avoidList" class="rail-list"></ul>
           </section>
 
-          <section class="rail-section baseline-section">
+          <section class="rail-panel">
             <div class="rail-heading">
-              <i data-lucide="scale" aria-hidden="true"></i>
-              <h2>判断依据</h2>
+              <span class="icon subtle" data-icon="chart"></span>
+              <h2>当前判定</h2>
             </div>
-            <p id="trendMessage">正在读取记录。</p>
-            <div class="baseline-meter" aria-hidden="true">
+            <p id="trendMessage" class="rail-copy">正在读取记录。</p>
+            <div class="meter" aria-hidden="true">
               <span id="baselineFill"></span>
             </div>
-            <div class="baseline-meta">
+            <div class="meta-row">
               <span id="baselineCount">0/7 个有效日</span>
-              <span id="recentEpisodeCount">近 7 天 0 次发作记录</span>
+              <span id="recentEpisodeCount">近 7 天 0 次发作</span>
             </div>
           </section>
 
-          <section id="reviewPrompt" class="review-prompt" hidden>
+          <section id="reviewPrompt" class="callout" hidden>
             <strong>长期基线可能已经变化</strong>
-            <p>近期趋势达到复盘条件，需要重新完整描述一次全部症状。</p>
+            <p>近期趋势达到复盘条件，建议完整复述一次症状和变化。</p>
             <button id="reviewButton" class="text-button" type="button">
-              开始完整复盘
-              <i data-lucide="arrow-right" aria-hidden="true"></i>
+              开始完整复述
+              <span class="icon" data-icon="arrow-right"></span>
             </button>
           </section>
 
-          <section class="rail-section next-section">
+          <section class="rail-panel">
             <div class="rail-heading">
-              <i data-lucide="eye" aria-hidden="true"></i>
+              <span class="icon subtle" data-icon="eye"></span>
               <h2>下一次只观察</h2>
             </div>
-            <p id="nextCheck">等待今日指令。</p>
+            <p id="nextCheck" class="rail-copy">等待今日指令。</p>
           </section>
         </aside>
+      </section>
 
-        <section class="safety-strip" role="note">
-          <i data-lucide="shield-alert" aria-hidden="true"></i>
-          <p id="safetyNote">发作时先确保自己处于不会摔倒或失控的位置。</p>
-        </section>
-      </main>
-
-      <footer class="console-footer">
-        <span>最近同步：<time id="lastSynced">--</time></span>
-        <span>用于个人记录和行动复盘，不替代诊断，也不调整处方药。</span>
-      </footer>
-    </div>
+      <section class="footer-bar" role="note">
+        <span id="lastSynced">--</span>
+        <span id="safetyNote">发作时优先安全停下，避免摔倒或硬撑骑行。</span>
+      </section>
+    </main>
 
     <div id="checkinModal" class="modal-backdrop" hidden>
       <section class="modal-sheet checkin-sheet" role="dialog" aria-modal="true" aria-labelledby="checkinTitle" tabindex="-1">
@@ -150,11 +144,12 @@
             <h2 id="checkinTitle">今天有什么变化</h2>
           </div>
           <button class="icon-button close-modal" type="button" aria-label="关闭">
-            <i data-lucide="x" aria-hidden="true"></i>
+            <span class="icon" data-icon="close"></span>
+            <span>关闭</span>
           </button>
         </header>
 
-        <form id="checkinForm">
+        <form id="checkinForm" class="checkin-form">
           <fieldset class="form-section">
             <legend>整体比平常</legend>
             <div class="choice-row three">
@@ -170,7 +165,7 @@
               <input type="range" name="walking_discomfort" min="0" max="10" value="4" />
             </label>
             <label class="metric-control">
-              <span>右脚不听使唤 <output id="footValue">4</output></span>
+              <span>右脚控制 <output id="footValue">4</output></span>
               <input type="range" name="right_foot_control" min="0" max="10" value="4" />
             </label>
           </div>
@@ -184,8 +179,8 @@
           </fieldset>
 
           <div id="episodeFields" class="conditional-fields" hidden>
-            <label>
-              持续分钟
+            <label class="field">
+              <span>持续分钟</span>
               <input type="number" name="episode_minutes" min="0" step="0.5" inputmode="decimal" placeholder="例如 6" />
             </label>
             <label class="metric-control">
@@ -197,10 +192,14 @@
           <fieldset class="form-section">
             <legend>今天出现过的触发</legend>
             <div id="triggerChoices" class="toggle-grid">
-              <label><input type="checkbox" value="惊吓" /><span>惊吓</span></label>
+              <label><input type="checkbox" value="晨起" /><span>晨起</span></label>
               <label><input type="checkbox" value="紧急叫起" /><span>紧急叫起</span></label>
+              <label><input type="checkbox" value="惊吓" /><span>惊吓</span></label>
               <label><input type="checkbox" value="骑行" /><span>骑行</span></label>
-              <label><input type="checkbox" value="静止到活动" /><span>活动切换</span></label>
+              <label><input type="checkbox" value="静止到活动" /><span>静止到活动</span></label>
+              <label><input type="checkbox" value="活动停止" /><span>活动停止</span></label>
+              <label><input type="checkbox" value="转身" /><span>转身</span></label>
+              <label><input type="checkbox" value="上下楼" /><span>上下楼</span></label>
             </div>
           </fieldset>
 
@@ -210,15 +209,15 @@
               <label><input type="radio" name="protocol_response" value="helped" /><span>有帮助</span></label>
               <label><input type="radio" name="protocol_response" value="no_change" /><span>没变化</span></label>
               <label><input type="radio" name="protocol_response" value="worse" /><span>更难受</span></label>
-              <label><input type="radio" name="protocol_response" value="not_used" checked /><span>没使用</span></label>
+              <label><input type="radio" name="protocol_response" value="not_used" checked /><span>没用</span></label>
             </div>
           </fieldset>
 
           <label class="disclosure-check">
             <input id="baselineChanged" type="checkbox" name="baseline_symptoms_changed" />
             <span>
-              <strong>长期固定症状有明显变化</strong>
-              <small>只有右髋弹响、外旋痛、小腿电流感等不同于平常时才打开。</small>
+              <strong>长期固定症状有变化</strong>
+              <small>只有右髋弹响、外旋痛、小腿电流感等基线改变时才展开。</small>
             </span>
           </label>
 
@@ -235,22 +234,21 @@
               <span>抬腿后内侧酸 <output id="innerThighValue">4</output></span>
               <input type="range" name="inner_thigh_acid" min="0" max="10" value="4" />
             </label>
-            <label>
-              变化说明
-              <textarea name="hip_snap_change" rows="2" placeholder="只写和平常不同的地方"></textarea>
+            <label class="field">
+              <span>变化说明</span>
+              <textarea name="hip_snap_change" rows="2" placeholder="只写和以前不同的地方"></textarea>
             </label>
           </div>
 
-          <label class="notes-field">
-            需要补充的情况
-            <textarea name="notes" rows="2" placeholder="可不填"></textarea>
+          <label class="field notes-field">
+            <span>补充说明</span>
+            <textarea name="notes" rows="2" placeholder="可留空"></textarea>
           </label>
 
           <div class="modal-actions">
             <button class="button secondary close-modal" type="button">取消</button>
             <button id="saveCheckinButton" class="button primary" type="submit">
-              <span>保存并更新指令</span>
-              <i data-lucide="arrow-right" aria-hidden="true"></i>
+              <span>保存变化</span>
             </button>
           </div>
         </form>
@@ -264,19 +262,20 @@
             <span class="live-dot" aria-hidden="true"></span>
             <span>发作模式</span>
           </div>
-          <button id="minimizeEpisode" class="icon-button dark" type="button" aria-label="暂时关闭">
-            <i data-lucide="minus" aria-hidden="true"></i>
+          <button id="minimizeEpisode" class="icon-button dark" type="button" aria-label="暂时收起">
+            <span class="icon" data-icon="minus"></span>
+            <span>收起</span>
           </button>
         </header>
 
         <div id="episodeTimerView" class="episode-timer-view">
-          <p class="episode-caption">先确保不会摔倒，再跟着当前步骤做</p>
+          <p class="episode-caption">先保证安全，再跟着当前步骤走。</p>
           <div id="episodeTimer" class="episode-timer">01:30</div>
           <h2 id="episodeTitle">停下或坐稳</h2>
           <p id="episodeInstruction">不要继续硬走或硬骑，先扶稳、靠边或坐下。</p>
 
           <ol id="episodeProgress" class="episode-progress">
-            <li class="active">停稳</li>
+            <li class="active">稳住</li>
             <li>定点</li>
             <li>呼吸</li>
             <li>点地</li>
@@ -288,9 +287,9 @@
 
         <form id="episodeFinishForm" class="episode-finish-form" hidden>
           <div>
-            <p class="section-label coral">完成记录</p>
+            <p class="section-label coral">记录完成</p>
             <h2>刚才这次发作怎么样</h2>
-            <p class="episode-summary">计时已经保留，只需补充几个关键结果。</p>
+            <p class="episode-summary">计时已经保留，只需要补几个关键结果。</p>
           </div>
 
           <label class="metric-control dark-control">
@@ -307,7 +306,7 @@
 
           <div class="impact-grid">
             <label><input type="checkbox" name="right_foot_affected" /><span>右脚控制受影响</span></label>
-            <label><input type="checkbox" name="right_hand_affected" /><span>右手或握把受影响</span></label>
+            <label><input type="checkbox" name="right_hand_affected" /><span>右手或右肘受影响</span></label>
           </div>
 
           <fieldset class="form-section dark-fieldset">
@@ -319,9 +318,9 @@
             </div>
           </fieldset>
 
-          <label class="dark-label">
-            补充说明
-            <textarea name="notes" rows="2" placeholder="可不填"></textarea>
+          <label class="field dark-label">
+            <span>补充说明</span>
+            <textarea name="notes" rows="2" placeholder="可留空"></textarea>
           </label>
 
           <button id="saveEpisodeButton" class="button episode-save" type="submit">保存这次发作</button>
