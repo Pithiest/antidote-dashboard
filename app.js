@@ -504,7 +504,7 @@ function renderDashboard(dashboard) {
   renderActionList(guidance.steps || []);
   renderAvoidList(guidance.avoid || []);
   updateGuidanceStateCopy(mode, trend);
-  populateCheckinForm(dashboard.today_entry || dashboard.latest_entry || null);
+  populateCheckinForm(dashboard.today_entry || null);
   syncIcons(document);
   updateButtonsEnabled(true);
   document.body.classList.remove("locked");
@@ -530,7 +530,7 @@ function populateCheckinForm(entry) {
   const form = dom.checkinForm;
   if (!form) return;
 
-  const draft = readJson(STORAGE_KEYS.checkinDraft, {});
+  const draft = readTodayCheckinDraft() || {};
   const data = { ...(entry || {}), ...(draft || {}) };
 
   setRadio(form, "baseline_change", data.baseline_change || "same");
@@ -876,6 +876,7 @@ function restoreEpisodeDraft() {
 function collectCheckinDraft() {
   if (!dom.checkinForm) return;
   const draft = {
+    entry_date: todayLocal(),
     baseline_change: getRadioValue(dom.checkinForm, "baseline_change") || "same",
     walking_discomfort: valueOf(dom.checkinForm, "walking_discomfort"),
     right_foot_control: valueOf(dom.checkinForm, "right_foot_control"),
@@ -894,8 +895,18 @@ function collectCheckinDraft() {
   saveJson(STORAGE_KEYS.checkinDraft, draft);
 }
 
-function restoreCheckinDraft() {
+function readTodayCheckinDraft() {
   const draft = readJson(STORAGE_KEYS.checkinDraft, null);
+  if (!draft) return null;
+  if (draft.entry_date !== todayLocal()) {
+    clearCheckinDraft();
+    return null;
+  }
+  return draft;
+}
+
+function restoreCheckinDraft() {
+  const draft = readTodayCheckinDraft();
   if (!draft || !dom.checkinForm) return;
   setRadio(dom.checkinForm, "baseline_change", draft.baseline_change || "same");
   setRange(dom.checkinForm, "walking_discomfort", draft.walking_discomfort ?? 4);
@@ -964,10 +975,10 @@ async function loginDevice(password) {
     if (!token) throw new Error("登录成功，但没有收到可信设备令牌");
 
     storeAuth(token, expiry);
+    clearCheckinDraft();
     clearDashboardCache();
     state.dashboard = response.dashboard || null;
     renderDashboard(state.dashboard);
-    clearCheckinDraft();
     await flushQueue();
     showToast("这台设备已被记住");
     setText("#loginStatus", "设备已记住，下次打开会自动恢复。");
