@@ -1,0 +1,8 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Antidote">
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="#F7F9F8"/>
+  <path d="M64 192L126 56H130L192 192" stroke="#10201D" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M96 132H160" stroke="#08786D" stroke-width="18" stroke-linecap="round"/>
+  <path d="M86 168C98 150 110 144 128 144C146 144 158 150 170 168" stroke="#C44E48" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="190" cy="74" r="11" fill="#A86111"/>
+  <path d="M190 95V119" stroke="#A86111" stroke-width="8" stroke-linecap="round"/>
+</svg>
