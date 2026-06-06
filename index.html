@@ -5,13 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f9f8" />
     <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' https://gnlvchwbygvexfaoaciv.supabase.co; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'"
+    />
+    <meta
       name="description"
       content="Antidote 私人康复指挥台，聚焦今日行动、发作处理、步态与右侧抽动的低刺激复盘。"
     />
     <title>Antidote</title>
     <link rel="icon" href="./assets/antidote-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css" />
-    <script type="module" defer src="./app.js"></script>
+    <link rel="stylesheet" href="./styles.css?v=20260606-5" />
+    <script type="module" defer src="./app.js?v=20260606-5"></script>
   </head>
   <body class="locked">
     <section class="login-screen" aria-label="网站登录">
@@ -165,7 +169,7 @@
               <input type="range" name="walking_discomfort" min="0" max="10" value="4" />
             </label>
             <label class="metric-control">
-              <span>右脚控制 <output id="footValue">4</output></span>
+              <span>右脚失控程度 <output id="footValue">4</output></span>
               <input type="range" name="right_foot_control" min="0" max="10" value="4" />
             </label>
           </div>
@@ -196,8 +200,9 @@
               <label><input type="checkbox" value="紧急叫起" /><span>紧急叫起</span></label>
               <label><input type="checkbox" value="惊吓" /><span>惊吓</span></label>
               <label><input type="checkbox" value="骑行" /><span>骑行</span></label>
+              <label><input type="checkbox" value="车把不稳" /><span>车把不稳</span></label>
               <label><input type="checkbox" value="静止到活动" /><span>静止到活动</span></label>
-              <label><input type="checkbox" value="活动停止" /><span>活动停止</span></label>
+              <label><input type="checkbox" value="活动到静止" /><span>活动停止</span></label>
               <label><input type="checkbox" value="转身" /><span>转身</span></label>
               <label><input type="checkbox" value="上下楼" /><span>上下楼</span></label>
             </div>

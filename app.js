@@ -488,7 +488,7 @@ function renderDashboard(dashboard) {
   setText("#baselineCount", `${trend.sample_count || 0}/${trend.required_count || 7} 个有效日`);
   setText("#recentEpisodeCount", `近 7 天 ${dashboard.recent_episode_count || 0} 次发作`);
   setText("#lastSynced", `已同步 ${formatTime(dashboard.synced_at)}`);
-  setText("#deviceStatus", state.token ? `可信设备 · 到期 ${formatExpiryLabel(state.tokenExpiry)}` : "陌生设备需要密码");
+  setText("#deviceStatus", state.token ? "云端已同步" : "陌生设备需要密码");
 
   const fill = $("#baselineFill");
   if (fill) {
@@ -605,16 +605,18 @@ function collectCheckin() {
     walking_discomfort: numberValue(form, "walking_discomfort", 0, 10, 4),
     right_foot_control: numberValue(form, "right_foot_control", 0, 10, 4),
     had_episode: hadEpisode,
-    episode_minutes: hadEpisode ? optionalNumberValue(form, "episode_minutes") : null,
+    episode_minutes: hadEpisode ? optionalNumberValue(form, "episode_minutes", 0, 999) : null,
     episode_peak_intensity: hadEpisode ? numberValue(form, "episode_peak_intensity", 0, 10, 5) : 0,
     trigger_tags: triggerTags,
     protocol_response: getRadioValue(form, "protocol_response") || "not_used",
     e_bike: triggerTags.includes("骑行"),
     urgent_wake: triggerTags.includes("紧急叫起"),
-    handlebar_unstable: triggerTags.includes("骑行") && hadEpisode && numberValue(form, "right_foot_control", 0, 10, 4) >= 6,
-    stop_after_activity_trigger: triggerTags.includes("静止到活动") || triggerTags.includes("活动停止"),
+    handlebar_unstable: triggerTags.includes("车把不稳"),
+    stop_after_activity_trigger: triggerTags.some((value) => ["静止到活动", "活动到静止", "活动切换"].includes(value)),
     baseline_symptoms_changed: baselineChanged,
-    right_hip_external_rotation_pain: baselineChanged ? numberValue(form, "right_hip_external_rotation_pain", 0, 10, 5) : null,
+    right_hip_external_rotation_pain: baselineChanged
+      ? numberValue(form, "right_hip_external_rotation_pain", 0, 10, 5)
+      : null,
     right_lower_leg_electric: baselineChanged ? numberValue(form, "right_lower_leg_electric", 0, 10, 3) : null,
     inner_thigh_acid: baselineChanged ? numberValue(form, "inner_thigh_acid", 0, 10, 4) : null,
     hip_snap_change: baselineChanged ? valueOf(form, "hip_snap_change").trim() : "",
@@ -624,21 +626,29 @@ function collectCheckin() {
   return checkin;
 }
 
-function numberValue(form, name, min, max, fallback) {
-  const value = Number(form.querySelector(`[name="${name}"]`)?.value);
-  if (!Number.isFinite(value)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(value)));
-}
-
-function optionalNumberValue(form, name) {
-  const raw = form.querySelector(`[name="${name}"]`)?.value;
-  if (raw === "" || raw === null || raw === undefined) return null;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : null;
-}
-
 function getRadioValue(form, name) {
-  return form.querySelector(`input[name="${name}"]:checked`)?.value || "";
+  const checked = form.querySelector(`input[name="${name}"]:checked`);
+  return checked ? checked.value : "";
+}
+
+function valueOf(form, name) {
+  const input = form.querySelector(`[name="${name}"]`);
+  return input ? input.value : "";
+}
+
+function numberValue(form, name, min, max, fallback) {
+  const input = form.querySelector(`[name="${name}"]`);
+  const numeric = Number(input?.value ?? fallback);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(numeric)));
+}
+
+function optionalNumberValue(form, name, min, max) {
+  const input = form.querySelector(`[name="${name}"]`);
+  if (!input || input.value.trim() === "") return null;
+  const numeric = Number(input.value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.min(max, Math.max(min, numeric));
 }
 
 function checkedValues(selector) {
@@ -647,19 +657,17 @@ function checkedValues(selector) {
     .map((input) => input.value);
 }
 
-function valueOf(form, name) {
-  return form.querySelector(`[name="${name}"]`)?.value || "";
-}
-
 function updateConditionalFields() {
-  const form = dom.checkinForm;
-  const hadEpisode = getRadioValue(form, "had_episode") === "yes";
-  dom.episodeFields.hidden = !hadEpisode;
-  dom.baselineChangeFields.hidden = !dom.baselineChanged?.checked;
+  if (!dom.checkinForm) return;
+  const hadEpisode = getRadioValue(dom.checkinForm, "had_episode") === "yes";
+  const baselineChanged = dom.baselineChanged?.checked || false;
+
+  if (dom.episodeFields) dom.episodeFields.hidden = !hadEpisode;
+  if (dom.baselineChangeFields) dom.baselineChangeFields.hidden = !baselineChanged;
 }
 
-function updateRangeOutputs(root = document) {
-  const map = [
+function updateRangeOutputs(form = document) {
+  const bindings = [
     ["walking_discomfort", "#walkingValue"],
     ["right_foot_control", "#footValue"],
     ["episode_peak_intensity", "#intensityValue"],
@@ -668,11 +676,247 @@ function updateRangeOutputs(root = document) {
     ["inner_thigh_acid", "#innerThighValue"],
     ["peak_intensity", "#episodePeakValue"],
   ];
-  map.forEach(([name, selector]) => {
-    const input = root.querySelector(`input[name="${name}"]`);
-    const output = $(selector);
+  bindings.forEach(([name, selector]) => {
+    const input = form.querySelector(`input[name="${name}"]`);
+    const output = $(selector, form) || $(selector);
     if (input && output) output.textContent = input.value;
   });
+}
+
+function openModal(modal) {
+  const el = typeof modal === "string" ? $(modal) : modal;
+  if (!el) return;
+  lastFocused = document.activeElement;
+  el.hidden = false;
+  document.body.classList.add("modal-open");
+  const focusable = el.querySelector("button, input, textarea, [tabindex]:not([tabindex='-1'])");
+  focusable?.focus();
+}
+
+function closeModal(modal) {
+  const el = typeof modal === "string" ? $(modal) : modal;
+  if (!el) return;
+  el.hidden = true;
+  if (!$(".modal-backdrop:not([hidden]), .episode-overlay:not([hidden])")) {
+    document.body.classList.remove("modal-open");
+  }
+  if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
+}
+
+function renderEpisodeState() {
+  const modal = dom.episodeModal;
+  if (!modal || !state.activeEpisode) return;
+
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(state.activeEpisode.started_at)) / 1000));
+  const remaining = Math.max(0, 90 - elapsedSeconds);
+  const phaseIndex = Math.min(EPISODE_PHASES.length - 1, Math.floor(Math.min(elapsedSeconds, 89) / 18));
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+
+  setText("#episodeTimer", `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`);
+  setText("#episodeTitle", EPISODE_PHASES[phaseIndex].title);
+  setText("#episodeInstruction", EPISODE_PHASES[phaseIndex].detail);
+
+  $$("#episodeProgress li").forEach((item, index) => {
+    item.classList.toggle("active", index === phaseIndex);
+    item.classList.toggle("complete", index < phaseIndex);
+  });
+
+  if (remaining === 0 && dom.episodeTimerView && dom.episodeFinishForm.hidden) {
+    dom.episodeTimerView.hidden = true;
+    dom.episodeFinishForm.hidden = false;
+    updateRangeOutputs(dom.episodeFinishForm);
+  }
+}
+
+function startEpisodeTicker() {
+  clearInterval(episodeTimer);
+  episodeTimer = setInterval(() => {
+    if (!state.activeEpisode) {
+      clearInterval(episodeTimer);
+      episodeTimer = null;
+      return;
+    }
+    renderEpisodeState();
+  }, 1000);
+}
+
+function stopEpisodeTicker() {
+  clearInterval(episodeTimer);
+  episodeTimer = null;
+}
+
+async function startEpisode() {
+  if (state.activeEpisode) {
+    openModal(dom.episodeModal);
+    dom.episodeTimerView.hidden = false;
+    dom.episodeFinishForm.hidden = true;
+    startEpisodeTicker();
+    renderEpisodeState();
+    showToast("发作模式已继续");
+    return;
+  }
+
+  state.activeEpisode = {
+    event_id: null,
+    started_at: new Date().toISOString(),
+  };
+  storeActiveEpisode(state.activeEpisode);
+
+  openModal(dom.episodeModal);
+  dom.episodeTimerView.hidden = false;
+  dom.episodeFinishForm.hidden = true;
+  startEpisodeTicker();
+  renderEpisodeState();
+
+  try {
+    const response = await request("startEpisode", { started_at: state.activeEpisode.started_at });
+    if (response?.event?.id) {
+      state.activeEpisode.event_id = response.event.id;
+      storeActiveEpisode(state.activeEpisode);
+    }
+  } catch (error) {
+    if (error.status === 401) {
+      queueCurrentEpisode();
+      handleAuthFailure("设备已失效，发作记录已暂存");
+      return;
+    }
+    showToast("发作计时已开始，结束时会继续保存");
+  }
+}
+
+function queueCurrentEpisode() {
+  if (!state.activeEpisode) return;
+  const payload = collectEpisodeFinish();
+  enqueuePending("finishEpisode", payload);
+}
+
+function collectEpisodeFinish() {
+  const form = dom.episodeFinishForm;
+  return {
+    event_id: state.activeEpisode?.event_id || null,
+    started_at: state.activeEpisode?.started_at || new Date().toISOString(),
+    finished_at: new Date().toISOString(),
+    duration_seconds: Math.max(0, Math.floor((Date.now() - Date.parse(state.activeEpisode?.started_at || new Date().toISOString())) / 1000)),
+    trigger_tags: checkedValues("#episodeTriggerChoices input"),
+    peak_intensity: numberValue(form, "peak_intensity", 0, 10, 5),
+    right_foot_affected: form.querySelector('[name="right_foot_affected"]')?.checked || false,
+    right_hand_affected: form.querySelector('[name="right_hand_affected"]')?.checked || false,
+    protocol_response: getRadioValue(form, "protocol_response") || "helped",
+    notes: valueOf(form, "notes").trim(),
+  };
+}
+
+async function finishEpisode(event) {
+  event.preventDefault();
+  const button = dom.saveEpisodeButton;
+  const payload = collectEpisodeFinish();
+  setBusy(button, true, "保存中");
+
+  try {
+    const response = await request("finishEpisode", payload);
+    state.dashboard = response;
+    saveJson(STORAGE_KEYS.dashboardCache, response);
+    showToast("这次发作已经保存");
+    clearEpisodeState();
+    renderDashboard(response);
+    closeModal(dom.episodeModal);
+  } catch (error) {
+    enqueuePending("finishEpisode", payload);
+    if (error.status === 401) {
+      clearEpisodeState();
+      handleAuthFailure("设备已失效，这次发作已暂存");
+    } else {
+      showToast("网络暂时不可用，这次发作已先存到本机");
+      clearEpisodeState();
+      closeModal(dom.episodeModal);
+    }
+  } finally {
+    setBusy(button, false, "保存这次发作");
+    stopEpisodeTicker();
+    resetEpisodeForm();
+  }
+}
+
+function clearEpisodeState() {
+  storeActiveEpisode(null);
+  stopEpisodeTicker();
+}
+
+function resetEpisodeForm() {
+  if (!dom.episodeFinishForm) return;
+  dom.episodeFinishForm.reset();
+  updateRangeOutputs(dom.episodeFinishForm);
+  saveJson(STORAGE_KEYS.episodeDraft, {});
+}
+
+function collectEpisodeDraft() {
+  if (!dom.episodeFinishForm) return;
+  const draft = {
+    peak_intensity: valueOf(dom.episodeFinishForm, "peak_intensity"),
+    right_foot_affected: dom.episodeFinishForm.querySelector('[name="right_foot_affected"]')?.checked || false,
+    right_hand_affected: dom.episodeFinishForm.querySelector('[name="right_hand_affected"]')?.checked || false,
+    protocol_response: getRadioValue(dom.episodeFinishForm, "protocol_response") || "helped",
+    notes: valueOf(dom.episodeFinishForm, "notes"),
+  };
+  saveJson(STORAGE_KEYS.episodeDraft, draft);
+}
+
+function restoreEpisodeDraft() {
+  const draft = readJson(STORAGE_KEYS.episodeDraft, null);
+  if (!draft || !dom.episodeFinishForm) return;
+  if (draft.peak_intensity !== undefined) setValue(dom.episodeFinishForm, "peak_intensity", draft.peak_intensity);
+  if (draft.right_foot_affected !== undefined) dom.episodeFinishForm.querySelector('[name="right_foot_affected"]').checked = draft.right_foot_affected;
+  if (draft.right_hand_affected !== undefined) dom.episodeFinishForm.querySelector('[name="right_hand_affected"]').checked = draft.right_hand_affected;
+  if (draft.protocol_response) setRadio(dom.episodeFinishForm, "protocol_response", draft.protocol_response);
+  if (draft.notes !== undefined) setValue(dom.episodeFinishForm, "notes", draft.notes);
+  updateRangeOutputs(dom.episodeFinishForm);
+}
+
+function collectCheckinDraft() {
+  if (!dom.checkinForm) return;
+  const draft = {
+    baseline_change: getRadioValue(dom.checkinForm, "baseline_change") || "same",
+    walking_discomfort: valueOf(dom.checkinForm, "walking_discomfort"),
+    right_foot_control: valueOf(dom.checkinForm, "right_foot_control"),
+    had_episode: getRadioValue(dom.checkinForm, "had_episode") || "no",
+    episode_minutes: valueOf(dom.checkinForm, "episode_minutes"),
+    episode_peak_intensity: valueOf(dom.checkinForm, "episode_peak_intensity"),
+    trigger_tags: checkedValues("#triggerChoices input"),
+    protocol_response: getRadioValue(dom.checkinForm, "protocol_response") || "not_used",
+    baseline_symptoms_changed: dom.baselineChanged?.checked || false,
+    right_hip_external_rotation_pain: valueOf(dom.checkinForm, "right_hip_external_rotation_pain"),
+    right_lower_leg_electric: valueOf(dom.checkinForm, "right_lower_leg_electric"),
+    inner_thigh_acid: valueOf(dom.checkinForm, "inner_thigh_acid"),
+    hip_snap_change: valueOf(dom.checkinForm, "hip_snap_change"),
+    notes: valueOf(dom.checkinForm, "notes"),
+  };
+  saveJson(STORAGE_KEYS.checkinDraft, draft);
+}
+
+function restoreCheckinDraft() {
+  const draft = readJson(STORAGE_KEYS.checkinDraft, null);
+  if (!draft || !dom.checkinForm) return;
+  setRadio(dom.checkinForm, "baseline_change", draft.baseline_change || "same");
+  setRange(dom.checkinForm, "walking_discomfort", draft.walking_discomfort ?? 4);
+  setRange(dom.checkinForm, "right_foot_control", draft.right_foot_control ?? 4);
+  setRadio(dom.checkinForm, "had_episode", draft.had_episode || "no");
+  setNumber(dom.checkinForm, "episode_minutes", draft.episode_minutes ?? "");
+  setRange(dom.checkinForm, "episode_peak_intensity", draft.episode_peak_intensity ?? 5);
+  setCheckboxes("#triggerChoices input", draft.trigger_tags || []);
+  setRadio(dom.checkinForm, "protocol_response", draft.protocol_response || "not_used");
+  setCheckbox(dom.baselineChanged, Boolean(draft.baseline_symptoms_changed));
+  setRange(dom.checkinForm, "right_hip_external_rotation_pain", draft.right_hip_external_rotation_pain ?? 5);
+  setRange(dom.checkinForm, "right_lower_leg_electric", draft.right_lower_leg_electric ?? 3);
+  setRange(dom.checkinForm, "inner_thigh_acid", draft.inner_thigh_acid ?? 4);
+  setValue(dom.checkinForm, "hip_snap_change", draft.hip_snap_change || "");
+  setValue(dom.checkinForm, "notes", draft.notes || "");
+  updateConditionalFields();
+  updateRangeOutputs(dom.checkinForm);
+}
+
+function clearCheckinDraft() {
+  localStorage.removeItem(STORAGE_KEYS.checkinDraft);
 }
 
 async function saveCheckin(event) {
@@ -703,69 +947,282 @@ async function saveCheckin(event) {
   }
 }
 
-function elapsedEpisodeSeconds() {
-  if (!state.activeEpisode?.started_at) return 0;
-  return Math.max(0, Math.floor((Date.now() - Date.parse(state.activeEpisode.started_at)) / 1000));
+async function loginDevice(password) {
+  const normalized = String(password || "").trim();
+  if (!normalized) {
+    setText("#loginStatus", "请输入网站密码。");
+    return;
+  }
+
+  const button = dom.loginButton;
+  setBusy(button, true, "验证中");
+
+  try {
+    const response = await request("loginDevice", { sitePassword: normalized }, { useAuth: false });
+    const token = response.device_token || "";
+    const expiry = response.trusted_device_expires_at || "";
+    if (!token) throw new Error("登录成功，但没有收到可信设备令牌");
+
+    storeAuth(token, expiry);
+    clearDashboardCache();
+    state.dashboard = response.dashboard || null;
+    renderDashboard(state.dashboard);
+    clearCheckinDraft();
+    await flushQueue();
+    showToast("这台设备已被记住");
+    setText("#loginStatus", "设备已记住，下次打开会自动恢复。");
+    dom.loginPassword.value = "";
+    dom.loginPassword.blur();
+  } catch (error) {
+    if (error.status === 401) {
+      setText("#loginStatus", "密码不正确，请再试一次。");
+    } else {
+      setText("#loginStatus", error.message || "登录失败，请稍后重试。");
+    }
+  } finally {
+    setBusy(button, false, "进入指挥台");
+  }
 }
 
-function episodeStepIndex(elapsed) {
-  return Math.min(EPISODE_PHASES.length - 1, Math.floor(Math.min(elapsed, 89) / 18));
+async function bootstrapDashboard(allowCache = true) {
+  if (!state.token) {
+    document.body.classList.add("locked");
+    renderStaticCopy();
+    return;
+  }
+
+  if (state.isBooting) return;
+  state.isBooting = true;
+  setText("#loginStatus", "正在恢复可信设备...");
+  updateDeviceChip("正在同步...");
+
+  try {
+    const response = await request("bootstrapDashboard");
+    state.dashboard = response;
+    saveJson(STORAGE_KEYS.dashboardCache, response);
+    if (response.trusted_device_expires_at) {
+      state.tokenExpiry = response.trusted_device_expires_at;
+      localStorage.setItem(STORAGE_KEYS.deviceExpiry, response.trusted_device_expires_at);
+    }
+    renderDashboard(response);
+    document.body.classList.remove("locked");
+    await flushQueue();
+    updateDeviceChip("云端已同步");
+  } catch (error) {
+    if (error.status === 401) {
+      handleAuthFailure("设备已失效，请重新输入密码。");
+      return;
+    }
+
+    if (allowCache && state.dashboard) {
+      renderDashboard(state.dashboard);
+      updateDeviceChip("离线缓存 · 等待重新同步");
+      showToast("暂时连不上云端，正在显示本机缓存", "warning");
+      document.body.classList.remove("locked");
+    } else {
+      setText("#loginStatus", "暂时无法恢复数据，请检查网络后重试。");
+      document.body.classList.add("locked");
+    }
+  } finally {
+    state.isBooting = false;
+  }
 }
 
-function renderEpisodeState() {
-  if (!state.activeEpisode) return;
-  const elapsed = elapsedEpisodeSeconds();
-  const remaining = Math.max(0, 90 - elapsed);
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
-  const stepIndex = episodeStepIndex(elapsed);
+async function refreshDevice() {
+  if (!state.token) {
+    handleAuthFailure("请先输入网站密码。");
+    return;
+  }
 
-  setText("#episodeTimer", `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`);
-  setText("#episodeTitle", EPISODE_PHASES[stepIndex].title);
-  setText("#episodeInstruction", EPISODE_PHASES[stepIndex].detail);
-  $$("#episodeProgress li").forEach((item, index) => {
-    item.classList.toggle("active", index === stepIndex);
-    item.classList.toggle("complete", index < stepIndex);
+  const button = dom.syncButton;
+  setBusy(button, true, "刷新中");
+  try {
+    const response = await request("refreshDevice");
+    if (response.trusted_device_expires_at) {
+      storeAuth(state.token, response.trusted_device_expires_at);
+    }
+    if (response.dashboard) {
+      state.dashboard = response.dashboard;
+      saveJson(STORAGE_KEYS.dashboardCache, response.dashboard);
+      renderDashboard(response.dashboard);
+    } else {
+      await bootstrapDashboard(true);
+    }
+    updateDeviceChip("云端已同步");
+    showToast("已经刷新云端数据");
+  } catch (error) {
+    if (error.status === 401) {
+      handleAuthFailure("设备已失效，请重新输入密码。");
+    } else {
+      showToast("刷新失败，稍后再试");
+    }
+  } finally {
+    setBusy(button, false, "刷新");
+  }
+}
+
+async function logoutDevice() {
+  const button = dom.logoutButton;
+  setBusy(button, true, "退出中");
+  try {
+    if (state.token) {
+      await request("logoutDevice").catch(() => {});
+    }
+  } finally {
+    clearAuth();
+    clearDashboardCache();
+    clearCheckinDraft();
+    clearEpisodeState();
+    storeQueue([]);
+    state.dashboard = null;
+    renderStaticCopy();
+    document.body.classList.add("locked");
+    updateDeviceChip("陌生设备需要密码");
+    setText("#loginStatus", "已经退出这台设备。");
+    dom.loginPassword.focus();
+    setBusy(button, false, "退出");
+  }
+}
+
+function handleAuthFailure(message) {
+  clearAuth();
+  document.body.classList.add("locked");
+  clearDashboardCache();
+  updateDeviceChip("陌生设备需要密码");
+  setText("#loginStatus", message);
+  renderStaticCopy();
+}
+
+async function flushQueue() {
+  const queue = uniqueQueued(getQueue());
+  if (!queue.length) {
+    storeQueue([]);
+    return;
+  }
+
+  const remaining = [];
+  for (const item of queue) {
+    try {
+      const response = await request(item.action, item.payload);
+      if (item.action === "saveCheckin" || item.action === "save") {
+        state.dashboard = response;
+        saveJson(STORAGE_KEYS.dashboardCache, response);
+        renderDashboard(response);
+      } else if (item.action === "finishEpisode") {
+        state.dashboard = response;
+        saveJson(STORAGE_KEYS.dashboardCache, response);
+        renderDashboard(response);
+      }
+    } catch (error) {
+      remaining.push(item);
+      if (error.status === 401) {
+        handleAuthFailure("设备已失效，待同步内容已保留。");
+        break;
+      }
+      break;
+    }
+  }
+
+  storeQueue(remaining);
+  if (!remaining.length) showToast("离线内容已同步完成");
+}
+
+function bindCheckinAutosave() {
+  if (!dom.checkinForm) return;
+  const saveDraft = () => {
+    collectCheckinDraft();
+    updateConditionalFields();
+    updateRangeOutputs(dom.checkinForm);
+  };
+
+  dom.checkinForm.addEventListener("input", saveDraft);
+  dom.checkinForm.addEventListener("change", saveDraft);
+}
+
+function bindEpisodeAutosave() {
+  if (!dom.episodeFinishForm) return;
+  const saveDraft = () => {
+    collectEpisodeDraft();
+    updateRangeOutputs(dom.episodeFinishForm);
+  };
+  dom.episodeFinishForm.addEventListener("input", saveDraft);
+  dom.episodeFinishForm.addEventListener("change", saveDraft);
+}
+
+function bindEvents() {
+  dom.loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    loginDevice(dom.loginPassword.value);
   });
 
-  if (remaining === 0 && dom.episodeFinishForm.hidden) {
+  dom.syncButton.addEventListener("click", refreshDevice);
+  dom.logoutButton.addEventListener("click", logoutDevice);
+  dom.checkinButton.addEventListener("click", () => openCheckinModal(false));
+  dom.reviewButton?.addEventListener("click", () => openCheckinModal(true));
+  dom.episodeButton.addEventListener("click", startEpisode);
+  dom.minimizeEpisode.addEventListener("click", () => closeModal(dom.episodeModal));
+  dom.finishEpisodeButton.addEventListener("click", () => {
     dom.episodeTimerView.hidden = true;
     dom.episodeFinishForm.hidden = false;
     updateRangeOutputs(dom.episodeFinishForm);
-  }
+  });
+  dom.checkinForm.addEventListener("submit", saveCheckin);
+  dom.episodeFinishForm.addEventListener("submit", finishEpisode);
+
+  $$(".close-modal").forEach((button) => {
+    button.addEventListener("click", () => closeModal(dom.checkinModal));
+  });
+
+  dom.checkinModal.addEventListener("click", (event) => {
+    if (event.target === dom.checkinModal) closeModal(dom.checkinModal);
+  });
+
+  dom.episodeModal.addEventListener("click", (event) => {
+    if (event.target === dom.episodeModal) closeModal(dom.episodeModal);
+  });
+
+  $$('input[name="had_episode"]').forEach((input) => input.addEventListener("change", updateConditionalFields));
+  dom.baselineChanged.addEventListener("change", updateConditionalFields);
+
+  $$('input[type="range"]').forEach((input) => {
+    input.addEventListener("input", () => {
+      updateRangeOutputs(document);
+      if (dom.checkinModal && !dom.checkinModal.hidden) collectCheckinDraft();
+      if (dom.episodeModal && !dom.episodeModal.hidden) collectEpisodeDraft();
+    });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (dom.episodeModal && !dom.episodeModal.hidden) {
+      closeModal(dom.episodeModal);
+    } else if (dom.checkinModal && !dom.checkinModal.hidden) {
+      closeModal(dom.checkinModal);
+    }
+  });
+
+  window.addEventListener("online", async () => {
+    if (state.token) {
+      showToast("网络恢复，正在重新同步");
+      await bootstrapDashboard(true);
+    }
+    await flushQueue();
+  });
+
+  window.addEventListener("offline", () => {
+    updateDeviceChip(state.token ? "离线，仍可继续本机记录" : "离线");
+    showToast("当前离线，记录会先保存在本机", "warning");
+  });
+
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible") return;
+    if (state.token && !state.isBooting) {
+      await bootstrapDashboard(true);
+    }
+  });
 }
 
-function startEpisodeTicker() {
-  stopEpisodeTicker();
-  renderEpisodeState();
-  episodeTimer = window.setInterval(renderEpisodeState, 1000);
-}
-
-function stopEpisodeTicker() {
-  if (episodeTimer) {
-    clearInterval(episodeTimer);
-    episodeTimer = null;
-  }
-}
-
-function openModal(modal) {
-  if (!modal) return;
-  lastFocused = document.activeElement;
-  modal.hidden = false;
-  document.body.classList.add("modal-open");
-  requestAnimationFrame(() => modal.querySelector('[role="dialog"]')?.focus());
-}
-
-function closeModal(modal) {
-  if (!modal) return;
-  modal.hidden = true;
-  if (dom.checkinModal.hidden && dom.episodeModal.hidden) {
-    document.body.classList.remove("modal-open");
-  }
-  if (lastFocused instanceof HTMLElement) lastFocused.focus();
-}
-
-function openCheckinModalLegacy(forceReview) {
+function openCheckinModal(forceReview) {
   if (forceReview) {
     dom.baselineChanged.checked = true;
     dom.baselineChangeFields.hidden = false;

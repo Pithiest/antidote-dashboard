@@ -26,6 +26,7 @@ type TrustedDeviceRow = {
 
 let cachedRuntimeConfig: RuntimeConfig | null = null;
 const TRUSTED_DEVICE_TTL_DAYS = 180;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function corsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
@@ -43,6 +44,29 @@ function json(req: Request, status: number, body: unknown) {
     status,
     headers: { ...corsHeaders(req), "Content-Type": "application/json; charset=utf-8" },
   });
+}
+
+function rateLimitKey(req: Request, action: string) {
+  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return `${forwarded || "unknown"}:${action}`;
+}
+
+function checkRateLimit(req: Request, action: string) {
+  const isLogin = action === "loginDevice";
+  const windowMs = isLogin ? 10 * 60_000 : 60_000;
+  const limit = isLogin ? 8 : 180;
+  const now = Date.now();
+  const key = rateLimitKey(req, action);
+  const bucket = rateBuckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+
+  if (bucket.count >= limit) return false;
+  bucket.count += 1;
+  return true;
 }
 
 async function sha256Hex(value: string) {
@@ -80,6 +104,17 @@ function cleanText(value: unknown, max = 2000) {
 function cleanTextArray(value: unknown, maxItems = 18, maxLength = 80) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => cleanText(item, maxLength)).filter(Boolean).slice(0, maxItems);
+}
+
+function cleanTimestamp(value: unknown) {
+  const text = cleanText(value, 64);
+  if (!text) return null;
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+function lowValueEvidenceTitle(value: unknown) {
+  return /(supplement|proceedings|platform and poster|abstracts? of the)/i.test(cleanText(value, 300));
 }
 
 function clampInt(value: unknown, min = 0, max = 10) {
@@ -401,6 +436,9 @@ function sanitizeCheckin(input: JsonRecord, syncHash: string) {
     stop_after_activity_trigger: asBoolean(input.stop_after_activity_trigger),
     baseline_symptoms_changed: asBoolean(input.baseline_symptoms_changed),
     medication_taken: typeof input.medication_taken === "boolean" ? input.medication_taken : null,
+    source_kind: cleanText(input.source_kind, 40) || "website",
+    source_ref: cleanText(input.source_ref, 160) || "website:daily-checkin",
+    observed_at: cleanTimestamp(input.observed_at) || new Date().toISOString(),
     notes: cleanText(input.notes, 1200),
     updated_at: new Date().toISOString(),
   };
@@ -416,13 +454,26 @@ function sanitizeCheckin(input: JsonRecord, syncHash: string) {
 }
 
 function sanitizeKnowledgeCard(input: JsonRecord, syncHash: string) {
+  const title = cleanText(input.title, 240) || cleanText(input.source_title, 240) || "Untitled source";
+  const excluded = lowValueEvidenceTitle(title);
+  const requestedQuality = cleanText(input.quality_status, 40) === "reviewed" ? "reviewed" : "candidate";
   return {
     sync_hash: syncHash,
     topic: cleanText(input.topic, 120) || "research",
-    title: cleanText(input.title, 240) || cleanText(input.source_title, 240) || "Untitled source",
+    title,
     source_title: cleanText(input.source_title, 240),
     source_url: cleanText(input.source_url, 500),
     evidence_type: cleanText(input.evidence_type, 80) || "literature",
+    doi: cleanText(input.doi, 160),
+    pmid: cleanText(input.pmid, 40),
+    publication_type: cleanText(input.publication_type, 80),
+    evidence_level: cleanText(input.evidence_level, 80) || "unrated",
+    relevance_score: clampInt(input.relevance_score, 0, 100),
+    full_text_status: cleanText(input.full_text_status, 40) || "not_checked",
+    quality_status: excluded ? "excluded" : requestedQuality,
+    is_active: !excluded && requestedQuality === "reviewed",
+    exclusion_reason: excluded ? "聚合补充材料、会议摘要集或标题不足以支持临床相关性判断" : "",
+    verified_at: cleanTimestamp(input.verified_at),
     key_finding: cleanText(input.key_finding, 1600),
     implication: cleanText(input.implication, 1600),
     caution: cleanText(input.caution, 1200),
@@ -539,7 +590,7 @@ async function getFullBundle(syncHash: string) {
       rest(`/rest/v1/antidote_research_runs?sync_hash=eq.${encode(syncHash)}&order=run_date.desc,created_at.desc&limit=40`, {
         method: "GET",
       }),
-      rest(`/rest/v1/antidote_knowledge_cards?sync_hash=eq.${encode(syncHash)}&order=created_at.desc&limit=120`, {
+      rest(`/rest/v1/antidote_knowledge_cards?sync_hash=eq.${encode(syncHash)}&is_active=eq.true&order=created_at.desc&limit=120`, {
         method: "GET",
       }),
       getEpisodeEvents(syncHash, 180),
@@ -572,8 +623,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
+    const action = cleanText(body.action, 80);
+    if (!checkRateLimit(req, action)) return json(req, 429, { error: "请求过于频繁，请稍后再试" });
 
-    if (body.action === "loginDevice") {
+    if (action === "loginDevice") {
       const syncHash = await verifySitePassword(body.sitePassword);
       if (!syncHash) return json(req, 401, { error: "网站密码错误" });
       const { token, device } = await createTrustedDevice(syncHash);
@@ -587,9 +640,12 @@ Deno.serve(async (req: Request) => {
     const auth = await resolveSyncHash(req, body);
     if (!auth) return json(req, 401, { error: "网站密码错误" });
     const syncHash = auth.syncHash;
-    const bearerAuth = auth.authMode === "device" ? await authFromBearer(req) : null;
+    const bearerAuth =
+      auth.authMode === "device" && auth.device
+        ? { syncHash: auth.syncHash, device: auth.device }
+        : null;
 
-    if (body.action === "refreshDevice") {
+    if (action === "refreshDevice") {
       if (!bearerAuth?.device) return json(req, 401, { error: "可信设备令牌无效" });
       return json(req, 200, {
         trusted_device_expires_at: nextTrustedDeviceExpiry(new Date(), TRUSTED_DEVICE_TTL_DAYS),
@@ -597,22 +653,22 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (body.action === "logoutDevice") {
+    if (action === "logoutDevice") {
       if (!bearerAuth?.device) return json(req, 401, { error: "可信设备令牌无效" });
       await revokeTrustedDevice(bearerAuth.device.id);
       return json(req, 200, { ok: true });
     }
 
-    if (body.action === "bootstrapDashboard") {
+    if (action === "bootstrapDashboard") {
       const dashboard = await buildDashboard(syncHash);
       return json(req, 200, bearerAuth?.device ? { ...dashboard, trusted_device_expires_at: nextTrustedDeviceExpiry(new Date(), TRUSTED_DEVICE_TTL_DAYS) } : dashboard);
     }
 
-    if (body.action === "saveCheckin" || body.action === "save") {
+    if (action === "saveCheckin" || action === "save") {
       return json(req, 200, await saveCheckin(syncHash, body.entry || body.checkin || {}));
     }
 
-    if (body.action === "startEpisode") {
+    if (action === "startEpisode") {
       const started = await rest("/rest/v1/antidote_episode_events", {
         method: "POST",
         headers: { Prefer: "return=representation" },
@@ -620,12 +676,14 @@ Deno.serve(async (req: Request) => {
           sync_hash: syncHash,
           started_at: body.started_at || new Date().toISOString(),
           trigger_tags: cleanTextArray(body.trigger_tags, 10, 60),
+          source_kind: "episode_mode",
+          source_ref: cleanText(body.source_ref, 160) || "website:episode-mode",
         }),
       });
       return json(req, 200, { event: Array.isArray(started) ? started[0] : started });
     }
 
-    if (body.action === "finishEpisode") {
+    if (action === "finishEpisode") {
       const payload = {
         finished_at: body.finished_at || new Date().toISOString(),
         duration_seconds: nonNegativeInt(body.duration_seconds),
@@ -634,6 +692,8 @@ Deno.serve(async (req: Request) => {
         right_foot_affected: asBoolean(body.right_foot_affected),
         right_hand_affected: asBoolean(body.right_hand_affected),
         protocol_response: cleanText(body.protocol_response, 30),
+        source_kind: "episode_mode",
+        source_ref: cleanText(body.source_ref, 160) || "website:episode-mode",
         notes: cleanText(body.notes, 800),
         updated_at: new Date().toISOString(),
       };
@@ -663,11 +723,11 @@ Deno.serve(async (req: Request) => {
       return json(req, 200, { event, ...(await buildDashboard(syncHash)) });
     }
 
-    if (body.action === "list" || body.action === "bootstrap") {
+    if (action === "list" || action === "bootstrap") {
       return json(req, 200, await getFullBundle(syncHash));
     }
 
-    if (body.action === "saveResearch") {
+    if (action === "saveResearch") {
       const payload = {
         sync_hash: syncHash,
         run_date: body.run_date || todayInShanghai(),
@@ -687,7 +747,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (body.action === "saveKnowledgeCards") {
+    if (action === "saveKnowledgeCards") {
       const cards = Array.isArray(body.cards) ? body.cards.slice(0, 20) : [];
       const payload = cards
         .map((card) => sanitizeKnowledgeCard(card as JsonRecord, syncHash))
