@@ -5,13 +5,14 @@ import {
   computeTrend,
 } from "../shared/antidote-guidance.js";
 
-const now = new Date("2026-06-11T12:00:00+08:00");
+const now = new Date("2026-06-12T12:00:00+08:00");
 
 function event(hoursAgo, overrides = {}) {
   return {
     started_at: new Date(now.getTime() - hoursAgo * 3_600_000).toISOString(),
     finished_at: new Date(now.getTime() - hoursAgo * 3_600_000 + 180_000).toISOString(),
     peak_intensity: 3,
+    control_affected: false,
     right_hand_affected: false,
     right_foot_affected: false,
     ...overrides,
@@ -22,6 +23,7 @@ function entry(daysAgo, overrides = {}) {
   const date = new Date(now.getTime() - daysAgo * 86_400_000);
   return {
     entry_date: date.toISOString().slice(0, 10),
+    observed_at: date.toISOString(),
     baseline_change: "same",
     episode_impact: "none",
     ...overrides,
@@ -31,25 +33,28 @@ function entry(daysAgo, overrides = {}) {
 {
   const entries = [entry(0), entry(1)];
   const events = [event(12, { right_hand_affected: true, right_foot_affected: true })];
-  const guidance = buildGuidance(entries, events, computeTrend(entries, events), now);
+  const guidance = buildGuidance(entries, events, computeTrend(entries, events, now), now);
 
   assert.equal(guidance.mode, "stabilize");
   assert.match(guidance.focus, /暂停骑电动车/);
-  assert.equal(guidance.steps.length, 3);
+  assert.match(guidance.steps[0].detail, /前兆/);
+  assert.match(guidance.steps[1].detail, /观察 30 秒/);
+  assert.match(guidance.steps[2].detail, /一次只测试一种/);
 }
 
 {
   const entries = [entry(0), entry(1)];
   const events = [event(6, { episode_impact: "control_affected", control_affected: true })];
-  const guidance = buildGuidance(entries, events, computeTrend(entries, events), now);
+  const guidance = buildGuidance(entries, events, computeTrend(entries, events, now), now);
 
   assert.equal(guidance.mode, "stabilize");
+  assert.match(guidance.safety_note, /右手和右脚恢复/);
 }
 
 {
   const entries = [entry(0), entry(1)];
   const events = [event(8), event(30)];
-  const guidance = buildGuidance(entries, events, computeTrend(entries, events), now);
+  const guidance = buildGuidance(entries, events, computeTrend(entries, events, now), now);
 
   assert.equal(guidance.mode, "stabilize");
   assert.match(guidance.rationale, /72 小时内反复发作/);
@@ -58,9 +63,10 @@ function entry(daysAgo, overrides = {}) {
 {
   const entries = [entry(0), entry(1)];
   const events = [event(80, { right_hand_affected: true })];
-  const guidance = buildGuidance(entries, events, computeTrend(entries, events), now);
+  const guidance = buildGuidance(entries, events, computeTrend(entries, events, now), now);
 
   assert.equal(guidance.mode, "maintain");
+  assert.match(guidance.focus, /不要主动诱发/);
 }
 
 {
@@ -73,7 +79,7 @@ function entry(daysAgo, overrides = {}) {
 
   assert.equal(trend.sample_count, 3);
   assert.equal(trend.status, "baseline");
-  assert.doesNotMatch(trend.message, /保持节奏/);
+  assert.match(trend.message, /建立个人基线/);
 }
 
 console.log("guidance tests passed");

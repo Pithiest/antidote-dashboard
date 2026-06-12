@@ -10,6 +10,8 @@ const requiredFunctions = [
   "refreshDevice",
   "logoutDevice",
   "startEpisode",
+  "beginIntervention",
+  "showEpisodeFinish",
   "finishEpisode",
   "flushQueue",
   "bindEvents",
@@ -29,25 +31,32 @@ assert.match(appSource, /request\(\s*"loginDevice"/);
 assert.match(appSource, /request\("saveCheckin"/);
 assert.match(appSource, /request\("startEpisode"/);
 assert.match(appSource, /request\("finishEpisode"/);
-assert.match(appSource, /populateCheckinForm\(dashboard\.today_entry \|\| null\)/);
-assert.doesNotMatch(appSource, /dashboard\.today_entry \|\| dashboard\.latest_entry/);
-assert.match(appSource, /entry_date:\s*todayLocal\(\)/);
+assert.match(appSource, /intervention_method:/);
+assert.match(appSource, /thirty_second_effect:/);
+assert.match(appSource, /right_hand_affected:/);
+assert.match(appSource, /right_foot_affected:/);
 assert.match(appSource, /function readTodayCheckinDraft\(\)/);
+assert.match(appSource, /entry_date:\s*todayLocal\(\)/);
+
 assert.match(htmlSource, /id="loginForm"/);
 assert.match(htmlSource, /id="episodeModal"/);
-assert.match(htmlSource, /name="episode_impact" value="none"/);
-assert.match(htmlSource, /name="episode_impact" value="control_ok"/);
-assert.match(htmlSource, /name="episode_impact" value="control_affected"/);
-assert.match(htmlSource, /name="notes"/);
-assert.doesNotMatch(htmlSource, /type="range"/);
-assert.doesNotMatch(htmlSource, /baselineCount/);
-assert.doesNotMatch(htmlSource, /7 个有效日/);
-assert.doesNotMatch(appSource, /90\s*-\s*elapsedSeconds/);
-assert.doesNotMatch(appSource, /EPISODE_PHASES/);
-assert.doesNotMatch(appSource, /可信设备 · 到期/);
-assert.match(htmlSource, /今天最重要的事/);
+assert.match(htmlSource, /id="episodeObserveView"/);
+assert.match(htmlSource, /id="episodeInterventionView"/);
+assert.match(htmlSource, /name="intervention_method" value="rhythmic_tap"/);
+assert.match(htmlSource, /name="intervention_method" value="light_touch"/);
+assert.match(htmlSource, /name="intervention_method" value="motor_imagery"/);
+assert.match(htmlSource, /name="thirty_second_effect" value="half_or_more"/);
+assert.match(htmlSource, /name="thirty_second_effect" value="less_than_half"/);
+assert.match(htmlSource, /name="thirty_second_effect" value="none_or_worse"/);
+assert.match(htmlSource, /name="right_hand_affected"/);
+assert.match(htmlSource, /name="right_foot_affected"/);
+
+assert.match(htmlSource, /先观察 30 秒/);
+assert.match(htmlSource, /每次只测试一种方法/);
 assert.match(htmlSource, /抽动开始/);
 assert.match(htmlSource, /记录变化/);
+assert.doesNotMatch(htmlSource, /type="range"/);
+assert.doesNotMatch(htmlSource, /知识库|研究复盘|Day 0|Day 1|A\/B\/C/);
 assert.doesNotMatch(appSource + htmlSource, /\uFFFD/);
 assert.doesNotMatch(htmlSource, /https?:\/\/[^"']+\.js/);
 

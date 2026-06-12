@@ -3,11 +3,26 @@ const API_URL = "https://gnlvchwbygvexfaoaciv.supabase.co/functions/v1/antidote-
 const STORAGE_KEYS = {
   deviceToken: "antidote.deviceToken.v4",
   deviceExpiry: "antidote.deviceExpiry.v4",
-  dashboardCache: "antidote.dashboardCache.v11",
-  pendingQueue: "antidote.pendingQueue.v5",
-  activeEpisode: "antidote.activeEpisode.v5",
-  checkinDraft: "antidote.checkinDraft.v4",
-  episodeDraft: "antidote.episodeDraft.v2",
+  dashboardCache: "antidote.dashboardCache.v12",
+  pendingQueue: "antidote.pendingQueue.v6",
+  activeEpisode: "antidote.activeEpisode.v6",
+  checkinDraft: "antidote.checkinDraft.v5",
+  episodeDraft: "antidote.episodeDraft.v3",
+};
+
+const INTERVENTIONS = {
+  rhythmic_tap: {
+    title: "左手节拍",
+    instruction: "坐稳并注视固定目标。跟随圆点节奏，左手每秒轻拍左大腿一次。",
+  },
+  light_touch: {
+    title: "轻触感觉输入",
+    instruction: "手掌轻触右外踝上方或右髋外侧。只接触，不按压、不捆紧。",
+  },
+  motor_imagery: {
+    title: "想象向后走",
+    instruction: "保持坐姿，闭眼想象连续向后走 10 步。不要实际倒走。",
+  },
 };
 
 const state = {
@@ -20,7 +35,7 @@ const state = {
 };
 
 const dom = {};
-let episodeTimer = null;
+let episodeTicker = null;
 let toastTimer = null;
 let lastFocused = null;
 
@@ -69,6 +84,12 @@ function formatTime(value) {
   }).format(date);
 }
 
+function formatElapsed(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -78,27 +99,31 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function setText(selector, value) {
-  const element = typeof selector === "string" ? $(selector) : selector;
+function setText(target, value) {
+  const element = typeof target === "string" ? $(target) : target;
   if (element) element.textContent = value ?? "";
 }
 
-function getRadioValue(form, name) {
-  return form?.querySelector(`input[name="${name}"]:checked`)?.value || "";
+function getRadioValue(root, name) {
+  return root?.querySelector(`input[name="${name}"]:checked`)?.value || "";
 }
 
-function setRadio(form, name, value) {
-  const input = form?.querySelector(`input[name="${name}"][value="${CSS.escape(String(value))}"]`);
+function setRadio(root, name, value) {
+  const input = root?.querySelector(`input[name="${name}"][value="${CSS.escape(String(value))}"]`);
   if (input) input.checked = true;
 }
 
-function valueOf(form, name) {
-  return form?.querySelector(`[name="${name}"]`)?.value || "";
+function valueOf(root, name) {
+  return root?.querySelector(`[name="${name}"]`)?.value || "";
 }
 
-function setValue(form, name, value) {
-  const input = form?.querySelector(`[name="${name}"]`);
+function setValue(root, name, value) {
+  const input = root?.querySelector(`[name="${name}"]`);
   if (input) input.value = value ?? "";
+}
+
+function checked(root, name) {
+  return Boolean(root?.querySelector(`[name="${name}"]`)?.checked);
 }
 
 async function request(action, payload = {}, options = {}) {
@@ -106,7 +131,6 @@ async function request(action, payload = {}, options = {}) {
   if (options.useAuth !== false && state.token) {
     headers.Authorization = `Bearer ${state.token}`;
   }
-
   const response = await fetch(API_URL, {
     method: "POST",
     headers,
@@ -163,13 +187,9 @@ function renderSteps(steps = []) {
     .map(
       (step) => `
         <li>
-          <div>
-            <strong>${escapeHtml(step.title)}</strong>
-            <p>${escapeHtml(step.detail)}</p>
-          </div>
-          <span class="step-time">${escapeHtml(step.time)}</span>
-        </li>
-      `,
+          <div><strong>${escapeHtml(step.title)}</strong><p>${escapeHtml(step.detail)}</p></div>
+          <span>${escapeHtml(step.time)}</span>
+        </li>`,
     )
     .join("");
 }
@@ -185,7 +205,6 @@ function renderDashboard(dashboard) {
   if (!dashboard) return;
   state.dashboard = dashboard;
   saveJson(STORAGE_KEYS.dashboardCache, dashboard);
-
   const guidance = dashboard.guidance || {};
   setText(dom.todayLabel, formatDate(new Date(`${dashboard.today || todayLocal()}T12:00:00+08:00`)));
   setText(dom.guidanceTitle, guidance.title || "等待今天的判断");
@@ -202,8 +221,7 @@ function renderDashboard(dashboard) {
 }
 
 function populateCheckinForm(entry) {
-  const draft = readTodayCheckinDraft();
-  const data = { ...(entry || {}), ...(draft || {}) };
+  const data = { ...(entry || {}), ...(readTodayCheckinDraft() || {}) };
   setRadio(dom.checkinForm, "baseline_change", data.baseline_change || "same");
   setRadio(dom.checkinForm, "episode_impact", data.episode_impact || "none");
   setValue(dom.checkinForm, "notes", data.notes || "");
@@ -215,10 +233,8 @@ function extractTriggerTags(notes) {
     ["紧急叫起", /(紧急叫|突然叫醒|午睡.*叫)/],
     ["惊吓", /(惊吓|吓到|吓了一跳)/],
     ["骑行", /(骑车|骑电动车|骑行|车把)/],
-    ["静止到活动", /(起身|久坐后|静止到活动|刚开始走)/],
+    ["静止到活动", /(起身|久坐后|刚开始走)/],
     ["活动到静止", /(活动停止|运动后停|跑完|走完)/],
-    ["转身", /(转身|右转|向后转)/],
-    ["上下楼", /(上楼|下楼|台阶)/],
   ];
   return rules.filter(([, pattern]) => pattern.test(notes)).map(([tag]) => tag);
 }
@@ -227,7 +243,6 @@ function collectCheckin() {
   const notes = valueOf(dom.checkinForm, "notes").trim();
   const episodeImpact = getRadioValue(dom.checkinForm, "episode_impact") || "none";
   const triggerTags = extractTriggerTags(notes);
-
   return {
     entry_date: todayLocal(),
     baseline_change: getRadioValue(dom.checkinForm, "baseline_change") || "same",
@@ -271,9 +286,7 @@ function openModal(modal) {
 
 function closeModal(modal) {
   modal.hidden = true;
-  if (!document.querySelector(".modal-backdrop:not([hidden]), .episode-overlay:not([hidden])")) {
-    document.body.classList.remove("modal-open");
-  }
+  document.body.classList.remove("modal-open");
   lastFocused?.focus?.();
 }
 
@@ -296,11 +309,8 @@ async function saveCheckin(event) {
   } catch (error) {
     enqueuePending("saveCheckin", { checkin: payload });
     closeModal(dom.checkinModal);
-    if (error.status === 401) {
-      handleAuthFailure("设备验证已失效，记录已暂存。");
-    } else {
-      showToast("网络不可用，记录已暂存在本机");
-    }
+    if (error.status === 401) handleAuthFailure("设备验证已失效，记录已暂存。");
+    else showToast("网络不可用，记录已暂存在本机");
   } finally {
     setBusy(dom.saveCheckinButton, false, "保存中");
   }
@@ -310,55 +320,93 @@ function storeActiveEpisode(value) {
   state.activeEpisode = value;
   if (value) saveJson(STORAGE_KEYS.activeEpisode, value);
   else localStorage.removeItem(STORAGE_KEYS.activeEpisode);
+  setText(dom.episodeButton, value ? "继续记录发作" : "抽动开始");
 }
 
-function formatElapsed(seconds) {
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+function phaseSecondsLeft(endAt) {
+  return Math.max(0, Math.ceil((Date.parse(endAt) - Date.now()) / 1000));
+}
+
+function showEpisodeView(name) {
+  dom.episodeObserveView.hidden = name !== "observe";
+  dom.episodeInterventionView.hidden = name !== "select";
+  dom.episodeInterventionRunView.hidden = name !== "run";
+  dom.episodeFinishForm.hidden = name !== "finish";
 }
 
 function renderEpisodeState() {
   if (!state.activeEpisode) return;
-  const elapsedSeconds = Math.max(
+  const elapsed = Math.max(
     0,
     Math.floor((Date.now() - Date.parse(state.activeEpisode.started_at)) / 1000),
   );
-  setText(dom.episodeTimer, formatElapsed(elapsedSeconds));
+  setText(dom.episodeTimer, formatElapsed(elapsed));
+
+  if (state.activeEpisode.phase === "observe") {
+    const left = phaseSecondsLeft(state.activeEpisode.observe_ends_at);
+    setText(dom.observeCountdown, left);
+    dom.chooseInterventionButton.disabled = left > 0;
+    setText(dom.chooseInterventionButton, left > 0 ? `${left} 秒后选择测试` : "选择本次测试");
+  }
+
+  if (state.activeEpisode.phase === "run") {
+    const left = phaseSecondsLeft(state.activeEpisode.intervention_ends_at);
+    setText(dom.interventionCountdown, left);
+    if (left === 0) showEpisodeFinish(false);
+  }
 }
 
 function startEpisodeTicker() {
-  clearInterval(episodeTimer);
+  clearInterval(episodeTicker);
   renderEpisodeState();
-  episodeTimer = setInterval(renderEpisodeState, 1000);
+  episodeTicker = setInterval(renderEpisodeState, 250);
 }
 
 function stopEpisodeTicker() {
-  clearInterval(episodeTimer);
-  episodeTimer = null;
+  clearInterval(episodeTicker);
+  episodeTicker = null;
+}
+
+function restoreEpisodeView() {
+  const phase = state.activeEpisode?.phase || "observe";
+  showEpisodeView(phase);
+  if (phase === "run") {
+    const method = state.activeEpisode.intervention_method;
+    setText(dom.interventionTitle, INTERVENTIONS[method]?.title || "单一变量测试");
+    setText(dom.interventionInstruction, INTERVENTIONS[method]?.instruction || "");
+    dom.metronomePulse.hidden = method !== "rhythmic_tap";
+  }
+  if (phase === "finish") restoreEpisodeDraft();
 }
 
 async function startEpisode() {
   if (state.activeEpisode) {
-    dom.episodeTimerView.hidden = false;
-    dom.episodeFinishForm.hidden = true;
+    restoreEpisodeView();
     openModal(dom.episodeModal);
     startEpisodeTicker();
     return;
   }
 
+  const startedAt = new Date().toISOString();
   const active = {
     event_id: null,
-    started_at: new Date().toISOString(),
+    started_at: startedAt,
+    phase: "observe",
+    observe_ends_at: new Date(Date.now() + 30_000).toISOString(),
+    intervention_method: "none",
+    intervention_started_at: null,
+    intervention_ends_at: null,
   };
   storeActiveEpisode(active);
-  dom.episodeTimerView.hidden = false;
-  dom.episodeFinishForm.hidden = true;
+  showEpisodeView("observe");
   openModal(dom.episodeModal);
   startEpisodeTicker();
 
   try {
-    const response = await request("startEpisode", { started_at: active.started_at });
+    const response = await request("startEpisode", {
+      started_at: startedAt,
+      source_ref: "website:episode-intervention",
+    });
     if (response?.event?.id) {
       active.event_id = response.event.id;
       storeActiveEpisode(active);
@@ -369,16 +417,54 @@ async function startEpisode() {
   }
 }
 
-function showEpisodeFinish() {
-  stopEpisodeTicker();
-  dom.episodeTimerView.hidden = true;
-  dom.episodeFinishForm.hidden = false;
+function chooseIntervention() {
+  if (!state.activeEpisode || phaseSecondsLeft(state.activeEpisode.observe_ends_at) > 0) return;
+  state.activeEpisode.phase = "select";
+  storeActiveEpisode(state.activeEpisode);
+  showEpisodeView("select");
+}
+
+function beginIntervention() {
+  if (!state.activeEpisode) return;
+  const method = getRadioValue(document, "intervention_method") || "rhythmic_tap";
+  const startedAt = new Date().toISOString();
+  state.activeEpisode = {
+    ...state.activeEpisode,
+    phase: "run",
+    intervention_method: method,
+    intervention_started_at: startedAt,
+    intervention_ends_at: new Date(Date.now() + 30_000).toISOString(),
+  };
+  storeActiveEpisode(state.activeEpisode);
+  setText(dom.interventionTitle, INTERVENTIONS[method].title);
+  setText(dom.interventionInstruction, INTERVENTIONS[method].instruction);
+  dom.metronomePulse.hidden = method !== "rhythmic_tap";
+  showEpisodeView("run");
+}
+
+function showEpisodeFinish(skipped = false) {
+  if (!state.activeEpisode || state.activeEpisode.phase === "finish") return;
+  state.activeEpisode.phase = "finish";
+  if (skipped) {
+    state.activeEpisode.intervention_method = "none";
+    state.activeEpisode.intervention_started_at = null;
+  }
+  storeActiveEpisode(state.activeEpisode);
+  dom.effectFieldset.hidden = skipped;
+  setRadio(
+    dom.episodeFinishForm,
+    "thirty_second_effect",
+    skipped ? "none_or_worse" : "none_or_worse",
+  );
+  showEpisodeView("finish");
   restoreEpisodeDraft();
 }
 
 function collectEpisodeFinish() {
-  const impact = getRadioValue(dom.episodeFinishForm, "episode_impact") || "control_ok";
   const finishedAt = new Date().toISOString();
+  const rightHand = checked(dom.episodeFinishForm, "right_hand_affected");
+  const rightFoot = checked(dom.episodeFinishForm, "right_foot_affected");
+  const method = state.activeEpisode?.intervention_method || "none";
   return {
     event_id: state.activeEpisode?.event_id || null,
     started_at: state.activeEpisode?.started_at || finishedAt,
@@ -387,17 +473,28 @@ function collectEpisodeFinish() {
       0,
       Math.floor((Date.now() - Date.parse(state.activeEpisode?.started_at || finishedAt)) / 1000),
     ),
-    episode_impact: impact,
-    control_affected: impact === "control_affected",
+    intervention_method: method,
+    intervention_started_at: state.activeEpisode?.intervention_started_at || null,
+    thirty_second_effect:
+      method === "none"
+        ? "not_tested"
+        : getRadioValue(dom.episodeFinishForm, "thirty_second_effect") || "none_or_worse",
+    episode_impact: rightHand || rightFoot ? "control_affected" : "control_ok",
+    control_affected: rightHand || rightFoot,
+    right_hand_affected: rightHand,
+    right_foot_affected: rightFoot,
     source_kind: "episode_mode",
-    source_ref: "website:episode-timer",
+    source_ref: "website:episode-intervention",
     notes: valueOf(dom.episodeFinishForm, "notes").trim(),
   };
 }
 
 function collectEpisodeDraft() {
   saveJson(STORAGE_KEYS.episodeDraft, {
-    episode_impact: getRadioValue(dom.episodeFinishForm, "episode_impact") || "control_ok",
+    thirty_second_effect:
+      getRadioValue(dom.episodeFinishForm, "thirty_second_effect") || "none_or_worse",
+    right_hand_affected: checked(dom.episodeFinishForm, "right_hand_affected"),
+    right_foot_affected: checked(dom.episodeFinishForm, "right_foot_affected"),
     notes: valueOf(dom.episodeFinishForm, "notes"),
   });
 }
@@ -405,7 +502,13 @@ function collectEpisodeDraft() {
 function restoreEpisodeDraft() {
   const draft = readJson(STORAGE_KEYS.episodeDraft, null);
   if (!draft) return;
-  setRadio(dom.episodeFinishForm, "episode_impact", draft.episode_impact || "control_ok");
+  setRadio(
+    dom.episodeFinishForm,
+    "thirty_second_effect",
+    draft.thirty_second_effect || "none_or_worse",
+  );
+  dom.episodeFinishForm.elements.right_hand_affected.checked = Boolean(draft.right_hand_affected);
+  dom.episodeFinishForm.elements.right_foot_affected.checked = Boolean(draft.right_foot_affected);
   setValue(dom.episodeFinishForm, "notes", draft.notes || "");
 }
 
@@ -414,6 +517,7 @@ function resetEpisodeState() {
   storeActiveEpisode(null);
   localStorage.removeItem(STORAGE_KEYS.episodeDraft);
   dom.episodeFinishForm.reset();
+  dom.effectFieldset.hidden = false;
 }
 
 async function finishEpisode(event) {
@@ -425,7 +529,7 @@ async function finishEpisode(event) {
     resetEpisodeState();
     renderDashboard(dashboard);
     closeModal(dom.episodeModal);
-    showToast("这次发作已保存");
+    showToast("本次发作已保存");
   } catch (error) {
     enqueuePending("finishEpisode", payload);
     resetEpisodeState();
@@ -516,7 +620,7 @@ async function bootstrapDashboard(allowCache = true) {
     } else if (allowCache && state.dashboard) {
       renderDashboard(state.dashboard);
       setText(dom.deviceStatus, "离线缓存");
-      showToast("暂时无法连接云端，正在显示本机缓存");
+      showToast("云端暂不可用，正在显示本机缓存");
     } else {
       handleAuthFailure("暂时无法读取数据，请检查网络。");
     }
@@ -565,15 +669,14 @@ function bindEvents() {
   dom.checkinForm.addEventListener("submit", saveCheckin);
   dom.checkinForm.addEventListener("input", collectCheckinDraft);
   dom.checkinForm.addEventListener("change", collectCheckinDraft);
+  dom.chooseInterventionButton.addEventListener("click", chooseIntervention);
+  dom.skipInterventionButton.addEventListener("click", () => showEpisodeFinish(true));
+  dom.beginInterventionButton.addEventListener("click", beginIntervention);
+  dom.stopInterventionButton.addEventListener("click", () => showEpisodeFinish(false));
   dom.episodeFinishForm.addEventListener("submit", finishEpisode);
   dom.episodeFinishForm.addEventListener("input", collectEpisodeDraft);
   dom.episodeFinishForm.addEventListener("change", collectEpisodeDraft);
-  dom.finishEpisodeButton.addEventListener("click", showEpisodeFinish);
-  dom.resumeEpisodeButton.addEventListener("click", () => {
-    dom.episodeTimerView.hidden = false;
-    dom.episodeFinishForm.hidden = true;
-    startEpisodeTicker();
-  });
+  dom.resumeEpisodeButton.addEventListener("click", () => closeModal(dom.episodeModal));
   dom.minimizeEpisode.addEventListener("click", () => closeModal(dom.episodeModal));
   dom.syncButton.addEventListener("click", refreshDevice);
   dom.logoutButton.addEventListener("click", logoutDevice);
@@ -592,36 +695,16 @@ function bindEvents() {
 
 function cacheDom() {
   [
-    "loginForm",
-    "loginPassword",
-    "loginButton",
-    "loginStatus",
-    "todayLabel",
-    "deviceStatus",
-    "syncButton",
-    "logoutButton",
-    "guidanceState",
-    "guidanceTitle",
-    "guidanceFocus",
-    "guidanceRationale",
-    "actionSteps",
-    "avoidList",
-    "safetyNote",
-    "lastSynced",
-    "checkinButton",
-    "episodeButton",
-    "checkinModal",
-    "checkinForm",
-    "saveCheckinButton",
-    "episodeModal",
-    "episodeTimerView",
-    "episodeTimer",
-    "episodeFinishForm",
-    "finishEpisodeButton",
-    "resumeEpisodeButton",
-    "saveEpisodeButton",
-    "minimizeEpisode",
-    "toast",
+    "loginForm", "loginPassword", "loginButton", "loginStatus", "todayLabel", "deviceStatus",
+    "syncButton", "logoutButton", "guidanceState", "guidanceTitle", "guidanceFocus",
+    "guidanceRationale", "actionSteps", "avoidList", "safetyNote", "lastSynced",
+    "checkinButton", "episodeButton", "checkinModal", "checkinForm", "saveCheckinButton",
+    "episodeModal", "episodeTimer", "episodeObserveView", "observeCountdown",
+    "chooseInterventionButton", "skipInterventionButton", "episodeInterventionView",
+    "beginInterventionButton", "episodeInterventionRunView", "interventionTitle",
+    "interventionInstruction", "interventionCountdown", "metronomePulse",
+    "stopInterventionButton", "episodeFinishForm", "effectFieldset", "resumeEpisodeButton",
+    "saveEpisodeButton", "minimizeEpisode", "toast",
   ].forEach((id) => {
     dom[id] = document.getElementById(id);
   });
@@ -632,7 +715,8 @@ async function init() {
   bindEvents();
   if (state.dashboard) renderDashboard(state.dashboard);
   if (state.activeEpisode) {
-    setText(dom.episodeButton, "继续发作计时");
+    setText(dom.episodeButton, "继续记录发作");
+    startEpisodeTicker();
   }
   await bootstrapDashboard(true);
 }

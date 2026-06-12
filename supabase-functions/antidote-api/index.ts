@@ -540,7 +540,13 @@ Deno.serve(async (req: Request) => {
         control_affected: asBoolean(body.control_affected),
         right_foot_affected: asBoolean(body.right_foot_affected),
         right_hand_affected: asBoolean(body.right_hand_affected),
-        protocol_response: cleanText(body.protocol_response, 30),
+        intervention_method: cleanText(body.intervention_method, 40) || "none",
+        intervention_started_at: cleanTimestamp(body.intervention_started_at),
+        thirty_second_effect: cleanText(body.thirty_second_effect, 40) || "not_tested",
+        protocol_response:
+          cleanText(body.thirty_second_effect, 40) ||
+          cleanText(body.protocol_response, 30) ||
+          "not_tested",
         source_kind: "episode_mode",
         source_ref: cleanText(body.source_ref, 160) || "website:episode-mode",
         notes: cleanText(body.notes, 800),

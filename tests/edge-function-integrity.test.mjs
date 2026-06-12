@@ -12,6 +12,9 @@ assert.match(source, /quality_status:\s*excluded\s*\?\s*"excluded"\s*:\s*request
 assert.match(source, /buildGuidance\(/);
 assert.match(source, /episode_impact/);
 assert.match(source, /control_affected:\s*asBoolean\(body\.control_affected\)/);
+assert.match(source, /intervention_method:\s*cleanText\(body\.intervention_method/);
+assert.match(source, /thirty_second_effect:\s*cleanText\(body\.thirty_second_effect/);
+assert.match(source, /intervention_started_at:\s*cleanTimestamp\(body\.intervention_started_at\)/);
 assert.doesNotMatch(source, /function guidanceFor\(/);
 
 console.log("edge function integrity tests passed");

@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#f7f8f6" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://gnlvchwbygvexfaoaciv.supabase.co; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'"
     />
-    <meta name="description" content="Antidote 私人行动指令台" />
+    <meta name="description" content="Antidote 私人发作干预记录" />
     <title>Antidote</title>
     <link rel="icon" href="./assets/antidote-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=20260611-1" />
-    <script type="module" defer src="./app.js?v=20260611-1"></script>
+    <link rel="stylesheet" href="./styles.css?v=20260612-1" />
+    <script type="module" defer src="./app.js?v=20260612-1"></script>
   </head>
   <body class="locked">
     <section class="login-screen" aria-label="网站登录">
@@ -20,18 +20,18 @@
         <img src="./assets/antidote-mark.svg" alt="" class="login-mark" />
         <div>
           <h1>Antidote</h1>
-          <p>仅陌生设备需要验证</p>
+          <p>陌生设备首次验证后会保持登录</p>
         </div>
         <label class="field">
           <span>网站密码</span>
           <input id="loginPassword" type="password" autocomplete="current-password" required />
         </label>
         <button id="loginButton" class="button primary" type="submit">进入</button>
-        <p id="loginStatus" class="system-message" role="status">验证后这台设备会保持登录。</p>
+        <p id="loginStatus" class="system-message" role="status"></p>
       </form>
     </section>
 
-    <main id="appShell" class="app-shell">
+    <main class="app-shell">
       <header class="topbar">
         <a class="brand" href="/" aria-label="Antidote 首页">
           <img src="./assets/antidote-mark.svg" alt="" />
@@ -42,26 +42,22 @@
         </a>
         <div class="topbar-actions">
           <span id="deviceStatus" class="sync-status">同步中</span>
-          <button id="syncButton" class="icon-button" type="button" aria-label="刷新" title="刷新">
-            <span aria-hidden="true">↻</span>
-          </button>
-          <button id="logoutButton" class="icon-button" type="button" aria-label="退出当前设备" title="退出当前设备">
-            <span aria-hidden="true">↪</span>
-          </button>
+          <button id="syncButton" class="icon-button" type="button" aria-label="刷新" title="刷新">↻</button>
+          <button id="logoutButton" class="icon-button" type="button" aria-label="退出当前设备" title="退出">↪</button>
         </div>
       </header>
 
-      <section class="command-layout" aria-label="今天的行动">
+      <section class="command-layout" aria-label="当前行动">
         <article class="command-panel">
           <header class="command-heading">
-            <p>今天最重要的事</p>
+            <p>现在最重要</p>
             <span id="guidanceState" class="status-mark">读取中</span>
           </header>
           <h1 id="guidanceTitle">正在读取最新记录</h1>
           <p id="guidanceFocus" class="focus-copy">请稍候。</p>
           <p id="guidanceRationale" class="reason-copy"></p>
 
-          <ol id="actionSteps" class="steps" aria-label="现在执行"></ol>
+          <ol id="actionSteps" class="steps" aria-label="按顺序执行"></ol>
 
           <div class="primary-actions">
             <button id="episodeButton" class="button danger" type="button">抽动开始</button>
@@ -72,7 +68,7 @@
         <aside class="avoid-panel">
           <header>
             <span class="avoid-symbol" aria-hidden="true">!</span>
-            <h2>今天不要做</h2>
+            <h2>暂时不要做</h2>
           </header>
           <ul id="avoidList"></ul>
           <p id="safetyNote" class="safety-note"></p>
@@ -81,7 +77,7 @@
 
       <footer class="footer-line">
         <span id="lastSynced">--</span>
-        <span>网站仅用于记录和风险分层，不调整处方药。</span>
+        <span>用于记录和筛选安全变量，不调整处方药。</span>
       </footer>
     </main>
 
@@ -90,14 +86,14 @@
         <header class="modal-header">
           <div>
             <p>约 15 秒</p>
-            <h2 id="checkinTitle">今天有什么变化</h2>
+            <h2 id="checkinTitle">今天有什么变化？</h2>
           </div>
           <button class="icon-button close-modal" type="button" aria-label="关闭">×</button>
         </header>
 
         <form id="checkinForm" class="compact-form">
           <fieldset>
-            <legend>1. 今天比平常</legend>
+            <legend>今天比平常</legend>
             <div class="segmented three">
               <label><input type="radio" name="baseline_change" value="lighter" /><span>更轻</span></label>
               <label><input type="radio" name="baseline_change" value="same" checked /><span>差不多</span></label>
@@ -106,7 +102,7 @@
           </fieldset>
 
           <fieldset>
-            <legend>2. 今天的抽动</legend>
+            <legend>今天的抽动</legend>
             <div class="stacked-options">
               <label>
                 <input type="radio" name="episode_impact" value="none" checked />
@@ -114,22 +110,22 @@
               </label>
               <label>
                 <input type="radio" name="episode_impact" value="control_ok" />
-                <span><strong>有抽动</strong><small>但右手、右脚和行动仍可控</small></span>
+                <span><strong>有抽动，但控制未受影响</strong></span>
               </label>
               <label>
                 <input type="radio" name="episode_impact" value="control_affected" />
-                <span><strong>抽动影响了控制</strong><small>右手、右脚、走路或骑行受到影响</small></span>
+                <span><strong>抽动影响了右手、右脚或行动</strong></span>
               </label>
             </div>
           </fieldset>
 
           <label class="field">
-            <span>3. 用一句话描述经过</span>
+            <span>一句话描述</span>
             <textarea
               name="notes"
-              rows="4"
+              rows="3"
               maxlength="1200"
-              placeholder="例如：午睡被紧急叫起，五分钟后骑车时右侧开始大幅抽动。"
+              placeholder="例如：午睡被紧急叫起，五分钟后开始大幅右侧抽动。"
             ></textarea>
           </label>
 
@@ -145,41 +141,95 @@
       <section class="episode-sheet" role="dialog" aria-modal="true" aria-labelledby="episodeTitle" tabindex="-1">
         <header class="episode-header">
           <div>
-            <p>发作记录</p>
+            <p>发作中</p>
             <h2 id="episodeTitle">先停止移动并坐稳</h2>
           </div>
           <button id="minimizeEpisode" class="icon-button dark" type="button" aria-label="暂时收起">−</button>
         </header>
 
-        <div id="episodeTimerView" class="episode-timer-view">
-          <div id="episodeTimer" class="episode-timer" aria-live="polite">00:00</div>
-          <p id="episodeInstruction">
-            不继续骑行或硬走。右手、右脚没有恢复到平常状态前，不重新上车。
-          </p>
-          <button id="finishEpisodeButton" class="button light" type="button">结束计时</button>
+        <div class="episode-total">
+          <span>本次持续</span>
+          <strong id="episodeTimer" aria-live="polite">00:00</strong>
         </div>
 
-        <form id="episodeFinishForm" class="episode-finish-form" hidden>
+        <div id="episodeObserveView" class="episode-stage">
+          <p class="stage-kicker">第 1 步</p>
+          <h3>先观察 30 秒</h3>
+          <p>坐到有靠背的位置或躺下，不压住右侧肢体，不做拉伸。只观察抽动频率和幅度。</p>
+          <div id="observeCountdown" class="phase-timer">30</div>
+          <button id="chooseInterventionButton" class="button light" type="button" disabled>30 秒后选择测试</button>
+          <button id="skipInterventionButton" class="text-button" type="button">不测试，直接记录结束</button>
+        </div>
+
+        <div id="episodeInterventionView" class="episode-stage" hidden>
+          <p class="stage-kicker">第 2 步</p>
+          <h3>每次只测试一种方法</h3>
           <fieldset>
-            <legend>这次是否影响控制</legend>
-            <div class="stacked-options dark-options">
+            <legend class="sr-only">选择本次测试方法</legend>
+            <div class="intervention-options">
               <label>
-                <input type="radio" name="episode_impact" value="control_ok" checked />
-                <span><strong>没有影响控制</strong></span>
+                <input type="radio" name="intervention_method" value="rhythmic_tap" checked />
+                <span><strong>左手节拍</strong><small>坐稳、看固定点，左手每秒轻拍左大腿一次。</small></span>
               </label>
               <label>
-                <input type="radio" name="episode_impact" value="control_affected" />
-                <span><strong>影响右手、右脚、走路或骑行</strong></span>
+                <input type="radio" name="intervention_method" value="light_touch" />
+                <span><strong>轻触感觉输入</strong><small>手掌轻触右外踝上方或右髋外侧，不按压、不捆紧。</small></span>
+              </label>
+              <label>
+                <input type="radio" name="intervention_method" value="motor_imagery" />
+                <span><strong>想象向后走</strong><small>保持坐姿，闭眼想象连续向后走 10 步，不实际倒走。</small></span>
               </label>
             </div>
           </fieldset>
+          <button id="beginInterventionButton" class="button light" type="button">开始 30 秒测试</button>
+        </div>
+
+        <div id="episodeInterventionRunView" class="episode-stage" hidden>
+          <p class="stage-kicker">正在测试</p>
+          <h3 id="interventionTitle">左手节拍</h3>
+          <p id="interventionInstruction"></p>
+          <div class="intervention-clock">
+            <span id="metronomePulse" class="metronome-pulse" aria-hidden="true"></span>
+            <strong id="interventionCountdown">30</strong>
+          </div>
+          <button id="stopInterventionButton" class="button danger-outline" type="button">不舒服，立即停止</button>
+        </div>
+
+        <form id="episodeFinishForm" class="episode-finish-form" hidden>
+          <fieldset id="effectFieldset">
+            <legend>30 秒后，抽动变化</legend>
+            <div class="stacked-options dark-options">
+              <label>
+                <input type="radio" name="thirty_second_effect" value="half_or_more" />
+                <span><strong>减少约一半或更多</strong></span>
+              </label>
+              <label>
+                <input type="radio" name="thirty_second_effect" value="less_than_half" />
+                <span><strong>有减少，但不到一半</strong></span>
+              </label>
+              <label>
+                <input type="radio" name="thirty_second_effect" value="none_or_worse" checked />
+                <span><strong>没有减少或更严重</strong></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>这次影响了什么？</legend>
+            <div class="checkbox-row">
+              <label><input type="checkbox" name="right_hand_affected" /><span>右手</span></label>
+              <label><input type="checkbox" name="right_foot_affected" /><span>右脚/走路</span></label>
+            </div>
+          </fieldset>
+
           <label class="field dark-field">
             <span>一句话补充</span>
-            <textarea name="notes" rows="3" maxlength="1200" placeholder="触发场景、动作幅度或恢复情况"></textarea>
+            <textarea name="notes" rows="2" maxlength="800" placeholder="触发场景或恢复情况"></textarea>
           </label>
+
           <div class="modal-actions">
-            <button id="resumeEpisodeButton" class="button dark-quiet" type="button">继续计时</button>
-            <button id="saveEpisodeButton" class="button light" type="submit">保存这次发作</button>
+            <button id="resumeEpisodeButton" class="button dark-quiet" type="button">还在发作</button>
+            <button id="saveEpisodeButton" class="button light" type="submit">保存本次记录</button>
           </div>
         </form>
       </section>
