@@ -6,6 +6,7 @@ import {
   trustedDeviceIsActive,
 } from "../../shared/antidote-auth.js";
 import {
+  buildDailyChecklist,
   buildGuidance,
   computeTrend,
 } from "../../shared/antidote-guidance.js";
@@ -350,12 +351,14 @@ async function buildDashboard(syncHash: string) {
   ]);
   const trend = computeTrend(entries, episodeEvents);
   const guidance = buildGuidance(entries, episodeEvents, trend);
+  const checklist = buildDailyChecklist(entries, episodeEvents);
   const activeEpisode = episodeEvents.find((event) => !event.finished_at) || null;
   return {
     today: todayInShanghai(),
     latest_entry: entries[0] || null,
     today_entry: entries.find((entry) => dateValue(entry.entry_date) === todayInShanghai()) || null,
     guidance,
+    checklist,
     trend,
     active_episode: activeEpisode,
     recent_episode_count: episodeEvents.filter((event) => {
@@ -364,6 +367,42 @@ async function buildDashboard(syncHash: string) {
     }).length,
     synced_at: new Date().toISOString(),
   };
+}
+
+async function getDocumentNotes(syncHash: string) {
+  return await rest(
+    `/rest/v1/antidote_document_notes?sync_hash=eq.${encode(syncHash)}&order=document_key.asc,note_type.asc,updated_at.desc`,
+    { method: "GET" },
+  ) as JsonRecord[];
+}
+
+async function syncDocumentNotes(syncHash: string, notes: unknown) {
+  const payload = (Array.isArray(notes) ? notes : [])
+    .slice(0, 20)
+    .map((note) => note as JsonRecord)
+    .map((note) => ({
+      sync_hash: syncHash,
+      document_key: cleanText(note.document_key, 60),
+      section_key: cleanText(note.section_key, 100) || "general",
+      note_type: cleanText(note.note_type, 30),
+      content: cleanText(note.content, 6000),
+      source_kind: cleanText(note.source_kind, 40) || "word",
+      updated_at: new Date().toISOString(),
+    }))
+    .filter(
+      (note) =>
+        ["dossier", "diary", "today"].includes(note.document_key) &&
+        ["personal", "expert"].includes(note.note_type) &&
+        note.content,
+    );
+  if (payload.length) {
+    await rest("/rest/v1/antidote_document_notes?on_conflict=sync_hash,document_key,section_key,note_type", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(payload),
+    });
+  }
+  return { saved_count: payload.length, document_notes: await getDocumentNotes(syncHash) };
 }
 
 async function upsertRecommendation(syncHash: string, entry: JsonRecord, guidance: JsonRecord, sourceEntryId?: string | null) {
@@ -420,7 +459,7 @@ async function saveCheckin(syncHash: string, input: JsonRecord) {
 }
 
 async function getFullBundle(syncHash: string) {
-  const [entries, profiles, historicalEvents, hypotheses, recommendations, researchRuns, knowledgeCards, episodeEvents] =
+  const [entries, profiles, historicalEvents, hypotheses, recommendations, researchRuns, knowledgeCards, episodeEvents, documentNotes] =
     await Promise.all([
       getEntries(syncHash, 366),
       rest(`/rest/v1/antidote_profiles?sync_hash=eq.${encode(syncHash)}&limit=1`, { method: "GET" }),
@@ -441,6 +480,7 @@ async function getFullBundle(syncHash: string) {
         method: "GET",
       }),
       getEpisodeEvents(syncHash, 180),
+      getDocumentNotes(syncHash),
     ]);
   return {
     entries,
@@ -451,6 +491,8 @@ async function getFullBundle(syncHash: string) {
     research_runs: researchRuns || [],
     knowledge_cards: knowledgeCards || [],
     episode_events: episodeEvents || [],
+    document_notes: documentNotes || [],
+    checklist: buildDailyChecklist(entries, episodeEvents),
   };
 }
 
@@ -580,6 +622,14 @@ Deno.serve(async (req: Request) => {
 
     if (action === "list" || action === "bootstrap") {
       return json(req, 200, await getFullBundle(syncHash));
+    }
+
+    if (action === "exportWordBundle") {
+      return json(req, 200, await getFullBundle(syncHash));
+    }
+
+    if (action === "syncDocumentNotes") {
+      return json(req, 200, await syncDocumentNotes(syncHash, body.notes));
     }
 
     if (action === "saveResearch") {

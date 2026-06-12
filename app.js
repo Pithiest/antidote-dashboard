@@ -201,6 +201,79 @@ function renderAvoid(items = []) {
     .join("");
 }
 
+function fallbackChecklist(dashboard = {}) {
+  const latestDate = dashboard.latest_entry?.entry_date || "无";
+  return {
+    basis: `最近记录日期为 ${latestDate}；按保守规则显示。`,
+    actions: [
+      {
+        title: "坐稳后再起身",
+        detail: "醒来或久坐后先坐稳，双脚自然踏地，不刻意把右腿外旋。",
+        dose: "60 秒，1 次",
+        expected: "呼吸自然，右手右脚没有突然失控感。",
+        stop: "抽动幅度上升、头晕、麻木扩散或意识异常时停止。",
+      },
+      {
+        title: "扶稳站立检查",
+        detail: "扶住固定支撑缓慢站起，不反复测试髋部弹响。",
+        dose: "30 秒，1 次",
+        expected: "右脚能稳定承重，没有明显偏移或踩空感。",
+        stop: "右脚不听使唤、右手抽动或必须抓紧支撑时坐回去。",
+      },
+      {
+        title: "室内短距离慢走",
+        detail: "仅在前两步稳定时，在无车流、无楼梯的环境自然慢走。",
+        dose: "10 步，1 组",
+        expected: "落脚位置可控，症状没有逐步升高。",
+        stop: "出现前兆、悬停卡顿、落点失控或大腿内侧迅速变酸时停止。",
+      },
+    ],
+    release: null,
+    stretch: null,
+    movement: "暂停骑电动车、跑步、引体向上、悬垂、蛙泳腿和需要快速转向的训练。",
+    diet: "规律进餐和补水，保持稳定睡眠；避免醉酒和未经核验的草药或补充剂，不自行开始生酮饮食。",
+    medication: "按医院处方服用现用药物，不自行停药、加量、减量或换药。",
+  };
+}
+
+function renderChecklist(checklist = {}) {
+  const actions = checklist.actions || [];
+  dom.rehabActions.innerHTML = actions
+    .slice(0, 3)
+    .map(
+      (action) => `
+        <li>
+          <div>
+            <strong>${escapeHtml(action.title)}</strong>
+            <p>${escapeHtml(action.detail)}</p>
+          </div>
+          <dl>
+            <div><dt>剂量</dt><dd>${escapeHtml(action.dose)}</dd></div>
+            <div><dt>正确感觉</dt><dd>${escapeHtml(action.expected)}</dd></div>
+            <div><dt>停止</dt><dd>${escapeHtml(action.stop)}</dd></div>
+          </dl>
+        </li>`,
+    )
+    .join("");
+
+  setText(dom.checklistBasis, checklist.basis || "等待最新记录");
+  setText(
+    dom.releaseAdvice,
+    checklist.release
+      ? `${checklist.release.area}：${checklist.release.method} ${checklist.release.dose}；${checklist.release.stop}`
+      : "今天不安排主动松解或深压。",
+  );
+  setText(
+    dom.stretchAdvice,
+    checklist.stretch
+      ? `${checklist.stretch.area}。${checklist.stretch.method} ${checklist.stretch.dose}；${checklist.stretch.stop}`
+      : "今天不安排右髋、内收肌或小腿拉伸。",
+  );
+  setText(dom.movementAdvice, checklist.movement || "");
+  setText(dom.dietAdvice, checklist.diet || "");
+  setText(dom.medicationAdvice, checklist.medication || "");
+}
+
 function renderDashboard(dashboard) {
   if (!dashboard) return;
   state.dashboard = dashboard;
@@ -216,6 +289,7 @@ function renderDashboard(dashboard) {
   setText(dom.deviceStatus, "云端已同步");
   renderSteps(guidance.steps || []);
   renderAvoid(guidance.avoid || []);
+  renderChecklist(dashboard.checklist || fallbackChecklist(dashboard));
   populateCheckinForm(dashboard.today_entry || null);
   document.body.classList.remove("locked");
 }
@@ -698,6 +772,8 @@ function cacheDom() {
     "loginForm", "loginPassword", "loginButton", "loginStatus", "todayLabel", "deviceStatus",
     "syncButton", "logoutButton", "guidanceState", "guidanceTitle", "guidanceFocus",
     "guidanceRationale", "actionSteps", "avoidList", "safetyNote", "lastSynced",
+    "rehabActions", "checklistBasis", "releaseAdvice", "stretchAdvice", "movementAdvice",
+    "dietAdvice", "medicationAdvice",
     "checkinButton", "episodeButton", "checkinModal", "checkinForm", "saveCheckinButton",
     "episodeModal", "episodeTimer", "episodeObserveView", "observeCountdown",
     "chooseInterventionButton", "skipInterventionButton", "episodeInterventionView",

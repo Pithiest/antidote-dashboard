@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  buildDailyChecklist,
   buildGuidance,
   computeTrend,
 } from "../shared/antidote-guidance.js";
@@ -83,3 +84,32 @@ function entry(daysAgo, overrides = {}) {
 }
 
 console.log("guidance tests passed");
+
+{
+  const entries = [entry(0, { baseline_change: "worse", episode_impact: "control_affected" })];
+  const events = [event(4, { control_affected: true, right_hand_affected: true })];
+  const checklist = buildDailyChecklist(entries, events, now);
+
+  assert.equal(checklist.state, "stabilize");
+  assert.equal(checklist.actions.length, 3);
+  assert.equal(checklist.release, null);
+  assert.equal(checklist.stretch, null);
+  assert.match(checklist.avoid.join(" "), /骑电动车/);
+  assert.match(checklist.medication, /不自行停药、加量、减量或换药/);
+  assert.match(checklist.diet, /不要自行开始生酮/);
+  for (const action of checklist.actions) {
+    assert.ok(action.dose);
+    assert.ok(action.expected);
+    assert.ok(action.stop);
+  }
+}
+
+{
+  const staleNow = new Date("2026-06-20T08:00:00+08:00");
+  const entries = [entry(8, { baseline_change: "same", episode_impact: "none" })];
+  const checklist = buildDailyChecklist(entries, [], staleNow);
+
+  assert.equal(checklist.data_stale, true);
+  assert.match(checklist.basis, /最近记录日期/);
+  assert.equal(checklist.state, "conservative");
+}

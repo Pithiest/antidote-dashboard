@@ -165,6 +165,114 @@ const episodeSteps = [
   },
 ];
 
+const transitionActions = [
+  {
+    title: "坐稳后再起身",
+    detail: "醒来或久坐后先坐稳，双脚自然踩地，不刻意把右腿外旋。",
+    dose: "60 秒，1 次",
+    expected: "呼吸自然，右手右脚没有突然失控感。",
+    stop: "抽动幅度上升、头晕、麻木扩散或意识异常时停止。",
+  },
+  {
+    title: "扶稳站立检查",
+    detail: "扶住固定支撑缓慢站起，保持双脚自然宽度，不反复测试髋部弹响。",
+    dose: "30 秒，1 次",
+    expected: "右脚能够稳定承重，没有明显向左偏移或踩空感。",
+    stop: "右脚不听使唤、右手抽动或需要抓紧支撑才能站稳时坐回去。",
+  },
+  {
+    title: "室内短距离慢走",
+    detail: "仅在前两步稳定时，在无车流、无楼梯的环境慢走，保持自然步幅。",
+    dose: "10 步，1 组",
+    expected: "落脚位置可控，症状没有逐步升高。",
+    stop: "出现前兆、大腿内侧快速变酸、悬停卡顿或落点失控时立即停止。",
+  },
+];
+
+function latestRecordedAt(entries, episodeEvents) {
+  const candidates = [
+    ...entries.map((entry) => timestamp(entry.observed_at || entry.updated_at, entry.entry_date)),
+    ...episodeEvents.map((event) => timestamp(event.finished_at || event.started_at)),
+  ].filter((value) => value !== null);
+  return candidates.length ? Math.max(...candidates) : null;
+}
+
+function checklistState(entries, episodeEvents, now) {
+  const latest = latestRecordedAt(entries, episodeEvents);
+  const dataStale = latest === null || now.getTime() - latest > 36 * HOUR_MS;
+  if (dataStale) return { state: "conservative", dataStale, latest };
+
+  const signals = recentSignals(entries, episodeEvents, now);
+  if (
+    signals.safetyImpact ||
+    signals.largeEpisode ||
+    signals.repeatedEpisodes ||
+    signals.recentWorse ||
+    signals.severeDaily ||
+    signals.threeWorse
+  ) {
+    return { state: "stabilize", dataStale, latest };
+  }
+  return { state: "maintain", dataStale, latest };
+}
+
+export function buildDailyChecklist(entries, episodeEvents, now = new Date()) {
+  const status = checklistState(entries, episodeEvents, now);
+  const latestDate = status.latest
+    ? new Intl.DateTimeFormat("zh-CN", {
+        timeZone: "Asia/Shanghai",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(status.latest))
+    : "无";
+  const unstable = status.state !== "maintain";
+
+  return {
+    state: status.state,
+    data_stale: status.dataStale,
+    basis: status.dataStale
+      ? `最近记录日期为 ${latestDate}，今天使用保守清单；录入新变化后立即重算。`
+      : `依据最近 72 小时的每日记录与发作事件生成，最近记录日期为 ${latestDate}。`,
+    focus: unstable
+      ? "先降低状态切换和移动中的失控风险，不主动诱发、不增加训练量。"
+      : "维持可控的自动步行节律，只增加一个低风险观察变量。",
+    actions: transitionActions,
+    release: unstable
+      ? null
+      : {
+          area: "右臀外侧周围",
+          method: "仅用手掌轻触或轻扫，不找痛点、不深压。",
+          dose: "30 秒，1 次",
+          stop: "疼痛、抽筋感、麻电感或抽动增加时停止。",
+        },
+    stretch: unstable
+      ? null
+      : {
+          area: "当天不做右髋外旋、P2侧弓步或内收肌强拉伸",
+          method: "如需活动，仅做不进入牵拉感的自然关节活动。",
+          dose: "不超过舒适范围的 3 次",
+          stop: "出现筋被拉住、髋弹响伴痛或大腿内侧快速酸时停止。",
+        },
+    observation: "只观察“坐稳后起身”是否降低前兆或右脚失控；当天不再叠加第二个新变量。",
+    movement: unstable
+      ? "暂停骑电动车、跑步、引体向上、悬垂、蛙泳腿和需要快速转向的训练。"
+      : "仅保留安全环境中的日常步行；恢复专项运动前需连续稳定并重新评估。",
+    diet:
+      "规律进餐和补水，保持稳定睡眠；避免醉酒、空腹高强度运动，以及未经药师核对的草药或补充剂。不要自行开始生酮饮食。",
+    medication:
+      "按医院处方服用现用药物，不自行停药、加量、减量或换药；记录漏服、嗜睡、情绪变化及意识事件供开药医生复核。",
+    doctor_discussion: [
+      "若多通道表面肌电/EEG-EMG支持皮层性阵挛，再由神经科讨论针对阵挛的药物路径。",
+      "若诱发状态下确认固定肌肉异常募集，再讨论定位肉毒毒素与目标性康复。",
+      "若出现分心改善、自动运动恢复等阳性体征，再讨论功能性运动障碍专门物理治疗。",
+    ],
+    avoid,
+    emergency:
+      "再次出现意识不清、长时间叫不醒，或全身强直阵挛超过 5 分钟时按急症处理。",
+  };
+}
+
 export function buildGuidance(entries, episodeEvents, trend, now = new Date()) {
   const signals = recentSignals(entries, episodeEvents, now);
   let mode = "maintain";

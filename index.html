@@ -57,7 +57,7 @@
           <p id="guidanceFocus" class="focus-copy">请稍候。</p>
           <p id="guidanceRationale" class="reason-copy"></p>
 
-          <ol id="actionSteps" class="steps" aria-label="按顺序执行"></ol>
+          <ol id="actionSteps" class="steps" aria-label="发作处理步骤" hidden></ol>
 
           <div class="primary-actions">
             <button id="episodeButton" class="button danger" type="button">抽动开始</button>
@@ -73,6 +73,38 @@
           <ul id="avoidList"></ul>
           <p id="safetyNote" class="safety-note"></p>
         </aside>
+      </section>
+
+      <section class="rehab-board" aria-labelledby="rehabBoardTitle">
+        <header class="rehab-board-header">
+          <div>
+            <p>今日康复清单</p>
+            <h2 id="rehabBoardTitle">按顺序完成，不主动诱发</h2>
+          </div>
+          <span id="checklistBasis">读取依据中</span>
+        </header>
+
+        <ol id="rehabActions" class="rehab-actions"></ol>
+
+        <div class="support-grid">
+          <section>
+            <h3>松解 / 拉伸</h3>
+            <p id="releaseAdvice">读取中</p>
+            <p id="stretchAdvice"></p>
+          </section>
+          <section>
+            <h3>运动</h3>
+            <p id="movementAdvice">读取中</p>
+          </section>
+          <section>
+            <h3>饮食与睡眠</h3>
+            <p id="dietAdvice">读取中</p>
+          </section>
+          <section>
+            <h3>药物</h3>
+            <p id="medicationAdvice">读取中</p>
+          </section>
+        </div>
       </section>
 
       <footer class="footer-line">
