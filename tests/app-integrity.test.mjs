@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
-const htmlSource = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const appSource = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+const htmlSource = await readFile(
+  new URL("../public/index.html", import.meta.url),
+  "utf8",
+);
 const vercelConfig = JSON.parse(
   await readFile(new URL("../vercel.json", import.meta.url), "utf8"),
 );
@@ -70,23 +73,6 @@ assert.doesNotMatch(htmlSource, /type="range"/);
 assert.doesNotMatch(htmlSource, /知识库|研究复盘|Day 0|Day 1|A\/B\/C/);
 assert.doesNotMatch(appSource + htmlSource, /\uFFFD/);
 assert.doesNotMatch(htmlSource, /https?:\/\/[^"']+\.js/);
-for (const privateSource of [
-  "/supabase-functions/:path*",
-  "/shared/:path*",
-  "/tests/:path*",
-  "/supabase-migration-action-console.sql",
-  "/supabase-migration-document-notes.sql",
-  "/supabase-migration-episode-interventions.sql",
-  "/supabase-migration-practical-rebuild.sql",
-  "/supabase-migration-precision-ledger.sql",
-  "/supabase-migration-trusted-devices.sql",
-]) {
-  assert.ok(
-    vercelConfig.rewrites.some(
-      (rewrite) => rewrite.source === privateSource && rewrite.destination === "/",
-    ),
-    `vercel.json must hide ${privateSource}`,
-  );
-}
+assert.equal(vercelConfig.outputDirectory, "public");
 
 console.log("app integrity tests passed");
