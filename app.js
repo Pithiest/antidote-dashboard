@@ -203,8 +203,23 @@ function renderAvoid(items = []) {
 
 function fallbackChecklist(dashboard = {}) {
   const latestDate = dashboard.latest_entry?.entry_date || "无";
+  const latestTimestamp = Date.parse(
+    dashboard.latest_entry?.observed_at ||
+      dashboard.latest_entry?.updated_at ||
+      `${latestDate}T12:00:00+08:00`,
+  );
+  const stale =
+    !Number.isFinite(latestTimestamp) ||
+    Date.now() - latestTimestamp > 36 * 3_600_000;
+  const unstable =
+    stale ||
+    ["stabilize", "reassess"].includes(dashboard.guidance?.mode) ||
+    dashboard.latest_entry?.baseline_change === "worse" ||
+    dashboard.latest_entry?.episode_impact === "control_affected";
   return {
-    basis: `最近记录日期为 ${latestDate}；按保守规则显示。`,
+    basis: stale
+      ? `最近记录日期为 ${latestDate}；没有新数据时按保守规则显示。`
+      : `依据最近记录与发作事件生成；最近记录日期为 ${latestDate}。`,
     actions: [
       {
         title: "坐稳后再起身",
@@ -228,9 +243,25 @@ function fallbackChecklist(dashboard = {}) {
         stop: "出现前兆、悬停卡顿、落点失控或大腿内侧迅速变酸时停止。",
       },
     ],
-    release: null,
-    stretch: null,
-    movement: "暂停骑电动车、跑步、引体向上、悬垂、蛙泳腿和需要快速转向的训练。",
+    release: unstable
+      ? null
+      : {
+          area: "右臀外侧周围",
+          method: "只用手掌轻触或轻扫，不找痛点、不深压。",
+          dose: "30 秒，1 次",
+          stop: "疼痛、抽筋感、麻电感或抽动增加时停止。",
+        },
+    stretch: unstable
+      ? null
+      : {
+          area: "不做右髋外旋、P2 侧弓步或内收肌强拉伸",
+          method: "只做不进入牵拉感的自然关节活动。",
+          dose: "舒适范围内 3 次",
+          stop: "出现牵拉、伴痛弹响或大腿内侧快速变酸时停止。",
+        },
+    movement: unstable
+      ? "暂停骑电动车、跑步、引体向上、悬垂、蛙泳腿和需要快速转向的训练。"
+      : "只保留安全环境中的日常步行；恢复专项运动前需要连续稳定并重新评估。",
     diet: "规律进餐和补水，保持稳定睡眠；避免醉酒和未经核验的草药或补充剂，不自行开始生酮饮食。",
     medication: "按医院处方服用现用药物，不自行停药、加量、减量或换药。",
   };
