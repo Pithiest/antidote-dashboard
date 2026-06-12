@@ -1,5 +1,44 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/supabase-functions/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/shared/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/tests/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/supabase-migration-action-console.sql",
+      "destination": "/"
+    },
+    {
+      "source": "/supabase-migration-document-notes.sql",
+      "destination": "/"
+    },
+    {
+      "source": "/supabase-migration-episode-interventions.sql",
+      "destination": "/"
+    },
+    {
+      "source": "/supabase-migration-practical-rebuild.sql",
+      "destination": "/"
+    },
+    {
+      "source": "/supabase-migration-precision-ledger.sql",
+      "destination": "/"
+    },
+    {
+      "source": "/supabase-migration-trusted-devices.sql",
+      "destination": "/"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
