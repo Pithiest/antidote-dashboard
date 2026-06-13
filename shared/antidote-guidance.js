@@ -154,14 +154,14 @@ const episodeSteps = [
     time: "马上",
   },
   {
-    title: "坐稳并观察",
-    detail: "坐到有靠背的位置或躺下，不压住肢体，先观察 30 秒。",
-    time: "30 秒",
+    title: "取得个人基线",
+    detail: "坐稳或躺稳后，每次抽动点一下，先记录连续 2 个抽动间隔。",
+    time: "约 1–3 分钟",
   },
   {
-    title: "只测试一种方法",
-    detail: "一次只测试一种低风险方法，共 30 秒；不舒服立即停止。",
-    time: "30 秒",
+    title: "主动测试节律竞争",
+    detail: "左手按 60 次/分钟节拍轻点，右侧不主动纠正，连续 3 分钟并继续记录抽动次数。",
+    time: "3 分钟",
   },
 ];
 
@@ -294,7 +294,7 @@ export function buildGuidance(entries, episodeEvents, trend, now = new Date()) {
     stabilize: {
       mode,
       title: "近期不稳定",
-      focus: "暂停骑电动车和诱发训练；自然发作时只做一次安全、可对照的中断测试。",
+      focus: "暂停骑电动车和诱发训练；下一次自然发作主动测试左手节律竞争。",
       rationale: signals.safetyImpact
         ? "最近 72 小时存在右手、右脚或行动控制受影响的发作。"
         : signals.repeatedEpisodes
@@ -304,17 +304,17 @@ export function buildGuidance(entries, episodeEvents, trend, now = new Date()) {
             : "最近 72 小时整体比平常更重。",
       steps: episodeSteps,
       avoid,
-      next_check: "记录测试方法、30 秒效果、总持续时间和右手右脚影响。",
+      next_check: "记录干预前两个抽动间隔、3 分钟内抽动次数、总持续时间和右手右脚影响。",
       safety_note: "右手和右脚恢复到平常状态前，不继续骑行或进入车流。",
     },
     maintain: {
       mode,
       title: "未见近期升级",
-      focus: "不要主动诱发；只有自然发作时按 30 秒观察和单变量测试流程记录。",
+      focus: "不要主动诱发；下一次自然发作按个人基线完成一次节律竞争测试。",
       rationale: "最近 72 小时没有记录到反复、大幅或影响控制的发作。",
       steps: episodeSteps,
       avoid,
-      next_check: "下一次自然发作时只测试一种方法，不同时叠加动作。",
+      next_check: "同一方法至少完成两次独立发作，再判断是否保留。",
       safety_note: "若抽动重新影响右手、右脚或行走，立即停止移动。",
     },
     progress: {

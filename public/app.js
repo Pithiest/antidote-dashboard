@@ -13,17 +13,27 @@ const STORAGE_KEYS = {
 const INTERVENTIONS = {
   rhythmic_tap: {
     title: "左手节拍",
-    instruction: "坐稳并注视固定目标。跟随圆点节奏，左手每秒轻拍左大腿一次。",
-  },
-  light_touch: {
-    title: "轻触感觉输入",
-    instruction: "手掌轻触右外踝上方或右髋外侧。只接触，不按压、不捆紧。",
-  },
-  motor_imagery: {
-    title: "想象向后走",
-    instruction: "保持坐姿，闭眼想象连续向后走 10 步。不要实际倒走。",
+    instruction: "坐稳。跟随圆点节奏，左手拇指与食指每秒轻点一次；右侧不要主动抵抗。",
   },
 };
+
+const EPISODE_GUIDANCE_STEPS = [
+  {
+    title: "前兆出现就停",
+    detail: "立即停止移动；骑行时安全停车、断电并离开车流。",
+    time: "马上",
+  },
+  {
+    title: "先取得基线",
+    detail: "坐稳或躺稳，每次抽动点一下，记录连续 2 个抽动间隔。",
+    time: "约 1–3 分钟",
+  },
+  {
+    title: "主动测试左手节拍",
+    detail: "左手按 60 次/分钟轻点，右侧不主动纠正，同时记录抽动，连续 3 分钟。",
+    time: "3 分钟",
+  },
+];
 
 const state = {
   token: localStorage.getItem(STORAGE_KEYS.deviceToken) || "",
@@ -309,7 +319,13 @@ function renderDashboard(dashboard) {
   if (!dashboard) return;
   state.dashboard = dashboard;
   saveJson(STORAGE_KEYS.dashboardCache, dashboard);
-  const guidance = dashboard.guidance || {};
+  const serverGuidance = dashboard.guidance || {};
+  const guidance = {
+    ...serverGuidance,
+    focus: "下一次自然发作主动测试左手节律竞争：先取得两个抽动间隔，再连续记录 3 分钟。",
+    steps: EPISODE_GUIDANCE_STEPS,
+    next_check: "记录基线间隔、3 分钟抽动次数、总持续时间和右手右脚控制影响。",
+  };
   setText(dom.todayLabel, formatDate(new Date(`${dashboard.today || todayLocal()}T12:00:00+08:00`)));
   setText(dom.guidanceTitle, guidance.title || "等待今天的判断");
   setText(dom.guidanceState, guidance.title || "读取中");
@@ -448,15 +464,31 @@ function renderEpisodeState() {
   setText(dom.episodeTimer, formatElapsed(elapsed));
 
   if (state.activeEpisode.phase === "observe") {
-    const left = phaseSecondsLeft(state.activeEpisode.observe_ends_at);
-    setText(dom.observeCountdown, left);
-    dom.chooseInterventionButton.disabled = left > 0;
-    setText(dom.chooseInterventionButton, left > 0 ? `${left} 秒后选择测试` : "选择本次测试");
+    const taps = state.activeEpisode.baseline_jerk_times || [];
+    const intervals = state.activeEpisode.baseline_intervals_seconds || [];
+    setText(dom.observeCountdown, `${Math.min(taps.length, 3)} / 3`);
+    setText(
+      dom.baselineIntervalSummary,
+      intervals.length === 2
+        ? `两个间隔：${intervals[0]} 秒、${intervals[1]} 秒`
+        : taps.length
+          ? `已记录 ${taps.length} 次抽动`
+          : "尚未形成基线",
+    );
+    dom.chooseInterventionButton.disabled = taps.length < 3;
+    setText(
+      dom.chooseInterventionButton,
+      taps.length < 3 ? "记录 3 次抽动后继续" : "开始本轮测试",
+    );
   }
 
   if (state.activeEpisode.phase === "run") {
     const left = phaseSecondsLeft(state.activeEpisode.intervention_ends_at);
-    setText(dom.interventionCountdown, left);
+    setText(dom.interventionCountdown, formatElapsed(left));
+    setText(
+      dom.interventionJerkButton,
+      `刚抽了一次 · ${state.activeEpisode.intervention_jerk_count || 0}`,
+    );
     if (left === 0) showEpisodeFinish(false);
   }
 }
@@ -497,10 +529,12 @@ async function startEpisode() {
     event_id: null,
     started_at: startedAt,
     phase: "observe",
-    observe_ends_at: new Date(Date.now() + 30_000).toISOString(),
+    baseline_jerk_times: [],
+    baseline_intervals_seconds: [],
     intervention_method: "none",
     intervention_started_at: null,
     intervention_ends_at: null,
+    intervention_jerk_count: 0,
   };
   storeActiveEpisode(active);
   showEpisodeView("observe");
@@ -522,8 +556,20 @@ async function startEpisode() {
   }
 }
 
+function recordBaselineJerk() {
+  if (!state.activeEpisode || state.activeEpisode.phase !== "observe") return;
+  const times = [...(state.activeEpisode.baseline_jerk_times || []), Date.now()].slice(-3);
+  const intervals = times
+    .slice(1)
+    .map((time, index) => Math.max(1, Math.round((time - times[index]) / 1000)));
+  state.activeEpisode.baseline_jerk_times = times;
+  state.activeEpisode.baseline_intervals_seconds = intervals;
+  storeActiveEpisode(state.activeEpisode);
+  renderEpisodeState();
+}
+
 function chooseIntervention() {
-  if (!state.activeEpisode || phaseSecondsLeft(state.activeEpisode.observe_ends_at) > 0) return;
+  if (!state.activeEpisode || (state.activeEpisode.baseline_jerk_times || []).length < 3) return;
   state.activeEpisode.phase = "select";
   storeActiveEpisode(state.activeEpisode);
   showEpisodeView("select");
@@ -531,20 +577,50 @@ function chooseIntervention() {
 
 function beginIntervention() {
   if (!state.activeEpisode) return;
-  const method = getRadioValue(document, "intervention_method") || "rhythmic_tap";
+  const method = "rhythmic_tap";
   const startedAt = new Date().toISOString();
   state.activeEpisode = {
     ...state.activeEpisode,
     phase: "run",
     intervention_method: method,
     intervention_started_at: startedAt,
-    intervention_ends_at: new Date(Date.now() + 30_000).toISOString(),
+    intervention_ends_at: new Date(Date.now() + 180_000).toISOString(),
+    intervention_jerk_count: 0,
   };
   storeActiveEpisode(state.activeEpisode);
   setText(dom.interventionTitle, INTERVENTIONS[method].title);
   setText(dom.interventionInstruction, INTERVENTIONS[method].instruction);
   dom.metronomePulse.hidden = method !== "rhythmic_tap";
   showEpisodeView("run");
+}
+
+function recordInterventionJerk() {
+  if (!state.activeEpisode || state.activeEpisode.phase !== "run") return;
+  state.activeEpisode.intervention_jerk_count =
+    Number(state.activeEpisode.intervention_jerk_count || 0) + 1;
+  storeActiveEpisode(state.activeEpisode);
+  renderEpisodeState();
+}
+
+function calculatedInterventionEffect() {
+  const intervals = state.activeEpisode?.baseline_intervals_seconds || [];
+  if (intervals.length < 2 || !state.activeEpisode?.intervention_started_at) {
+    return "none_or_worse";
+  }
+  const averageInterval = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
+  const elapsedSeconds = Math.max(
+    1,
+    Math.min(
+      180,
+      Math.floor((Date.now() - Date.parse(state.activeEpisode.intervention_started_at)) / 1000),
+    ),
+  );
+  const expectedJerks = elapsedSeconds / averageInterval;
+  const observedJerks = Number(state.activeEpisode.intervention_jerk_count || 0);
+  const ratio = expectedJerks > 0 ? observedJerks / expectedJerks : 1;
+  if (ratio <= 0.5) return "half_or_more";
+  if (ratio < 1) return "less_than_half";
+  return "none_or_worse";
 }
 
 function showEpisodeFinish(skipped = false) {
@@ -559,7 +635,7 @@ function showEpisodeFinish(skipped = false) {
   setRadio(
     dom.episodeFinishForm,
     "thirty_second_effect",
-    skipped ? "none_or_worse" : "none_or_worse",
+    skipped ? "none_or_worse" : calculatedInterventionEffect(),
   );
   showEpisodeView("finish");
   restoreEpisodeDraft();
@@ -570,6 +646,29 @@ function collectEpisodeFinish() {
   const rightHand = checked(dom.episodeFinishForm, "right_hand_affected");
   const rightFoot = checked(dom.episodeFinishForm, "right_foot_affected");
   const method = state.activeEpisode?.intervention_method || "none";
+  const intervals = state.activeEpisode?.baseline_intervals_seconds || [];
+  const interventionJerks = Number(state.activeEpisode?.intervention_jerk_count || 0);
+  const interventionDuration = state.activeEpisode?.intervention_started_at
+    ? Math.max(
+        0,
+        Math.min(
+          180,
+          Math.floor(
+            (Date.now() - Date.parse(state.activeEpisode.intervention_started_at)) / 1000,
+          ),
+        ),
+      )
+    : null;
+  const userNotes = valueOf(dom.episodeFinishForm, "notes").trim();
+  const metricNote = [
+    intervals.length
+      ? `基线间隔：${intervals.map((value) => `${value}秒`).join("、")}`
+      : "基线间隔：未完成",
+    method === "none" ? "未测试干预" : `3 分钟抽动：${interventionJerks}次`,
+    interventionDuration === null ? "" : `实际干预：${interventionDuration}秒`,
+  ]
+    .filter(Boolean)
+    .join("；");
   return {
     event_id: state.activeEpisode?.event_id || null,
     started_at: state.activeEpisode?.started_at || finishedAt,
@@ -580,6 +679,9 @@ function collectEpisodeFinish() {
     ),
     intervention_method: method,
     intervention_started_at: state.activeEpisode?.intervention_started_at || null,
+    baseline_intervals_seconds: intervals,
+    intervention_jerk_count: interventionJerks,
+    intervention_duration_seconds: interventionDuration,
     thirty_second_effect:
       method === "none"
         ? "not_tested"
@@ -590,7 +692,7 @@ function collectEpisodeFinish() {
     right_foot_affected: rightFoot,
     source_kind: "episode_mode",
     source_ref: "website:episode-intervention",
-    notes: valueOf(dom.episodeFinishForm, "notes").trim(),
+    notes: userNotes ? `[${metricNote}] ${userNotes}` : `[${metricNote}]`,
   };
 }
 
@@ -774,9 +876,11 @@ function bindEvents() {
   dom.checkinForm.addEventListener("submit", saveCheckin);
   dom.checkinForm.addEventListener("input", collectCheckinDraft);
   dom.checkinForm.addEventListener("change", collectCheckinDraft);
+  dom.baselineJerkButton.addEventListener("click", recordBaselineJerk);
   dom.chooseInterventionButton.addEventListener("click", chooseIntervention);
   dom.skipInterventionButton.addEventListener("click", () => showEpisodeFinish(true));
   dom.beginInterventionButton.addEventListener("click", beginIntervention);
+  dom.interventionJerkButton.addEventListener("click", recordInterventionJerk);
   dom.stopInterventionButton.addEventListener("click", () => showEpisodeFinish(false));
   dom.episodeFinishForm.addEventListener("submit", finishEpisode);
   dom.episodeFinishForm.addEventListener("input", collectEpisodeDraft);
@@ -807,9 +911,10 @@ function cacheDom() {
     "dietAdvice", "medicationAdvice",
     "checkinButton", "episodeButton", "checkinModal", "checkinForm", "saveCheckinButton",
     "episodeModal", "episodeTimer", "episodeObserveView", "observeCountdown",
-    "chooseInterventionButton", "skipInterventionButton", "episodeInterventionView",
+    "baselineJerkButton", "baselineIntervalSummary", "chooseInterventionButton",
+    "skipInterventionButton", "episodeInterventionView",
     "beginInterventionButton", "episodeInterventionRunView", "interventionTitle",
-    "interventionInstruction", "interventionCountdown", "metronomePulse",
+    "interventionInstruction", "interventionCountdown", "interventionJerkButton", "metronomePulse",
     "stopInterventionButton", "episodeFinishForm", "effectFieldset", "resumeEpisodeButton",
     "saveEpisodeButton", "minimizeEpisode", "toast",
   ].forEach((id) => {

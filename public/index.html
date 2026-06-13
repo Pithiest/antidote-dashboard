@@ -186,34 +186,21 @@
 
         <div id="episodeObserveView" class="episode-stage">
           <p class="stage-kicker">第 1 步</p>
-          <h3>先观察 30 秒</h3>
-          <p>坐到有靠背的位置或躺下，不压住右侧肢体，不做拉伸。只观察抽动频率和幅度。</p>
-          <div id="observeCountdown" class="phase-timer">30</div>
-          <button id="chooseInterventionButton" class="button light" type="button" disabled>30 秒后选择测试</button>
+          <h3>记录连续 2 个抽动间隔</h3>
+          <p>坐稳或躺稳。每次抽动发生时点一下；记录到第 3 次抽动后即可开始测试。</p>
+          <div id="observeCountdown" class="phase-timer">0 / 3</div>
+          <button id="baselineJerkButton" class="button danger" type="button">刚抽了一次</button>
+          <p id="baselineIntervalSummary" class="stage-note">尚未形成基线</p>
+          <button id="chooseInterventionButton" class="button light" type="button" disabled>记录 3 次抽动后继续</button>
           <button id="skipInterventionButton" class="text-button" type="button">不测试，直接记录结束</button>
         </div>
 
         <div id="episodeInterventionView" class="episode-stage" hidden>
           <p class="stage-kicker">第 2 步</p>
-          <h3>每次只测试一种方法</h3>
-          <fieldset>
-            <legend class="sr-only">选择本次测试方法</legend>
-            <div class="intervention-options">
-              <label>
-                <input type="radio" name="intervention_method" value="rhythmic_tap" checked />
-                <span><strong>左手节拍</strong><small>坐稳、看固定点，左手每秒轻拍左大腿一次。</small></span>
-              </label>
-              <label>
-                <input type="radio" name="intervention_method" value="light_touch" />
-                <span><strong>轻触感觉输入</strong><small>手掌轻触右外踝上方或右髋外侧，不按压、不捆紧。</small></span>
-              </label>
-              <label>
-                <input type="radio" name="intervention_method" value="motor_imagery" />
-                <span><strong>想象向后走</strong><small>保持坐姿，闭眼想象连续向后走 10 步，不实际倒走。</small></span>
-              </label>
-            </div>
-          </fieldset>
-          <button id="beginInterventionButton" class="button light" type="button">开始 30 秒测试</button>
+          <h3>3 分钟左手节律</h3>
+          <p>左手拇指与食指跟随圆点每秒轻点一次。右侧不要主动抵抗或纠正。</p>
+          <input type="hidden" name="intervention_method" value="rhythmic_tap" />
+          <button id="beginInterventionButton" class="button light" type="button">开始 3 分钟测试</button>
         </div>
 
         <div id="episodeInterventionRunView" class="episode-stage" hidden>
@@ -222,14 +209,15 @@
           <p id="interventionInstruction"></p>
           <div class="intervention-clock">
             <span id="metronomePulse" class="metronome-pulse" aria-hidden="true"></span>
-            <strong id="interventionCountdown">30</strong>
+            <strong id="interventionCountdown">03:00</strong>
           </div>
+          <button id="interventionJerkButton" class="button danger" type="button">刚抽了一次 · 0</button>
           <button id="stopInterventionButton" class="button danger-outline" type="button">不舒服，立即停止</button>
         </div>
 
         <form id="episodeFinishForm" class="episode-finish-form" hidden>
           <fieldset id="effectFieldset">
-            <legend>30 秒后，抽动变化</legend>
+            <legend>3 分钟内，抽动变化</legend>
             <div class="stacked-options dark-options">
               <label>
                 <input type="radio" name="thirty_second_effect" value="half_or_more" />

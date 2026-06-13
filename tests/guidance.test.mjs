@@ -39,8 +39,9 @@ function entry(daysAgo, overrides = {}) {
   assert.equal(guidance.mode, "stabilize");
   assert.match(guidance.focus, /暂停骑电动车/);
   assert.match(guidance.steps[0].detail, /前兆/);
-  assert.match(guidance.steps[1].detail, /观察 30 秒/);
-  assert.match(guidance.steps[2].detail, /一次只测试一种/);
+  assert.match(guidance.steps[1].detail, /连续 2 个抽动间隔/);
+  assert.match(guidance.steps[2].detail, /60 次\/分钟/);
+  assert.match(guidance.steps[2].detail, /3 分钟/);
 }
 
 {
@@ -67,7 +68,7 @@ function entry(daysAgo, overrides = {}) {
   const guidance = buildGuidance(entries, events, computeTrend(entries, events, now), now);
 
   assert.equal(guidance.mode, "maintain");
-  assert.match(guidance.focus, /不要主动诱发/);
+  assert.match(guidance.focus, /自然发作/);
 }
 
 {

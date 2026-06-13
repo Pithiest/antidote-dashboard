@@ -16,6 +16,8 @@ const requiredFunctions = [
   "refreshDevice",
   "logoutDevice",
   "startEpisode",
+  "recordBaselineJerk",
+  "recordInterventionJerk",
   "beginIntervention",
   "showEpisodeFinish",
   "finishEpisode",
@@ -48,17 +50,25 @@ assert.match(htmlSource, /id="loginForm"/);
 assert.match(htmlSource, /id="episodeModal"/);
 assert.match(htmlSource, /id="episodeObserveView"/);
 assert.match(htmlSource, /id="episodeInterventionView"/);
+assert.match(htmlSource, /id="baselineJerkButton"/);
+assert.match(htmlSource, /id="baselineIntervalSummary"/);
+assert.match(htmlSource, /id="interventionJerkButton"/);
 assert.match(htmlSource, /name="intervention_method" value="rhythmic_tap"/);
-assert.match(htmlSource, /name="intervention_method" value="light_touch"/);
-assert.match(htmlSource, /name="intervention_method" value="motor_imagery"/);
 assert.match(htmlSource, /name="thirty_second_effect" value="half_or_more"/);
 assert.match(htmlSource, /name="thirty_second_effect" value="less_than_half"/);
 assert.match(htmlSource, /name="thirty_second_effect" value="none_or_worse"/);
 assert.match(htmlSource, /name="right_hand_affected"/);
 assert.match(htmlSource, /name="right_foot_affected"/);
 
-assert.match(htmlSource, /先观察 30 秒/);
-assert.match(htmlSource, /每次只测试一种方法/);
+assert.match(htmlSource, /记录连续 2 个抽动间隔/);
+assert.match(htmlSource, /3 分钟左手节律/);
+assert.doesNotMatch(htmlSource, /先观察 30 秒/);
+assert.match(appSource, /180_000/);
+assert.match(appSource, /baseline_jerk_times/);
+assert.match(appSource, /intervention_jerk_count/);
+assert.match(appSource, /基线间隔/);
+assert.match(appSource, /3 分钟抽动/);
+assert.match(appSource, /const EPISODE_GUIDANCE_STEPS/);
 assert.match(htmlSource, /抽动开始/);
 assert.match(htmlSource, /记录变化/);
 assert.match(htmlSource, /id="rehabActions"/);

@@ -111,6 +111,15 @@ function cleanTextArray(value: unknown, maxItems = 18, maxLength = 80) {
   return value.map((item) => cleanText(item, maxLength)).filter(Boolean).slice(0, maxItems);
 }
 
+function cleanNumberArray(value: unknown, maxItems = 8, maxValue = 3600) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item) && item >= 0)
+    .map((item) => Math.min(maxValue, Math.round(item * 10) / 10))
+    .slice(0, maxItems);
+}
+
 function cleanTimestamp(value: unknown) {
   const text = cleanText(value, 64);
   if (!text) return null;
@@ -584,6 +593,9 @@ Deno.serve(async (req: Request) => {
         right_hand_affected: asBoolean(body.right_hand_affected),
         intervention_method: cleanText(body.intervention_method, 40) || "none",
         intervention_started_at: cleanTimestamp(body.intervention_started_at),
+        baseline_intervals_seconds: cleanNumberArray(body.baseline_intervals_seconds, 2, 3600),
+        intervention_jerk_count: nonNegativeInt(body.intervention_jerk_count),
+        intervention_duration_seconds: nonNegativeInt(body.intervention_duration_seconds),
         thirty_second_effect: cleanText(body.thirty_second_effect, 40) || "not_tested",
         protocol_response:
           cleanText(body.thirty_second_effect, 40) ||
